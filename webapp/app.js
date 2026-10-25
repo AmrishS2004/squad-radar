@@ -240,7 +240,11 @@
   function modelStatus() {
     const m = S.llm || {};
     let dot = "off", title, detail;
-    if (!m.enabled) { title = "Language model off"; detail = "Set XAI_API_KEY on the server to turn on summaries, translation and free-form answers. Everything else works without it."; }
+    if (m.resting && !(m.fallback && m.enabled)) { dot = "wait"; title = (m.provider || "Model") + " resting (free quota used)";
+      detail = "Built-in replies for now. Trying again in about " + Math.max(1, Math.round(m.resting / 60)) + " min."; }
+    else if (m.resting && m.fallback) { dot = "ok"; title = "Using backup: " + (m.fallback.provider || "model");
+      detail = (m.provider || "Main model") + " is resting (quota), back in about " + Math.max(1, Math.round(m.resting / 60)) + " min."; }
+    else if (!m.enabled) { title = "Language model off"; detail = "Set XAI_API_KEY on the server to turn on summaries, translation and free-form answers. Everything else works without it."; }
     else if (m.ok) { dot = "ok"; title = (m.provider || "Model") + " connected"; detail = (m.model || "") + ", " + m.ok + (m.ok === 1 ? " answer" : " answers") + " since the server started"; }
     else if (m.last_error) { title = "Can't reach " + (m.provider || "the model"); detail = String(m.last_error).slice(0, 110); }
     else { dot = "wait"; title = (m.provider || "Model") + " ready"; detail = (m.model || "Choosing a model") + ". Ask @squad anything to use it."; }

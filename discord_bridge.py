@@ -145,7 +145,8 @@ class DiscordBridge:
         self.live = False
         self.live_task = None
         self.live_count = 0
-        self.live_every = float(os.environ.get("SQUAD_LIVE_EVERY") or 30)
+        self.live_every = float(os.environ.get("SQUAD_LIVE_EVERY") or 45)
+        self.live_model_share = float(os.environ.get("SQUAD_LIVE_MODEL_SHARE") or 0.5)  # rest come from scripted lines
         self.live_max = int(os.environ.get("SQUAD_LIVE_MAX") or 300)
         self.quiet = bool(os.environ.get("SQUAD_QUIET"))
         with app.db_lock:
@@ -642,7 +643,8 @@ class DiscordBridge:
         recent = [m for m in room["messages"] if m["kind"] in ("user", "bot")][-14:]
         members = [n for n in spec["members"] if n in slot["personas"]]
         llm = self.app.bot.llm
-        if llm is not None and getattr(llm, "enabled", False):
+        use_model = random.random() < self.live_model_share or not spec.get("lines")
+        if use_model and llm is not None and getattr(llm, "enabled", False):
             profiles = self.app.bot.profiles
             people = "\n".join("- %s: %s%s" % (n, profiles.get(n, {}).get("vibe") or "college student",
                                                  (", sometimes writes in " + profiles[n]["prefs"]["language"]) if profiles.get(n, {}).get("prefs", {}).get("language") else "")

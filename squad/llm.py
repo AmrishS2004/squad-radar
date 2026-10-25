@@ -29,7 +29,7 @@ class Grok:
     """OpenAI-compatible chat client. Grok (xAI) by default; set LLM_BASE_URL + LLM_API_KEY + LLM_MODEL to use
     another provider (OpenAI, Groq, OpenRouter, Together, DeepSeek, a local Ollama server...)."""
 
-    def __init__(self, key=None, model=None, timeout=None, base=None):
+    def __init__(self, key=None, model=None, timeout=None, base=None, fallback=True):
         self.key = key or os.environ.get("LLM_API_KEY") or os.environ.get("XAI_API_KEY", "")
         self.model = model or os.environ.get("LLM_MODEL") or os.environ.get("XAI_MODEL", "")
         self.base = (base or _api_base()).rstrip("/")
@@ -42,10 +42,28 @@ class Grok:
         self.calls = 0      # requests attempted
         self.ok = 0         # requests that returned an answer
         self.last_ok = None
+        self.cooldown_until = 0  # set when the provider says "too many requests / quota exceeded"
+        self.last_model = None   # which model wrote the latest answer (the backup, while the main one rests)
+        self.fallback = None
+        fb_key = os.environ.get("LLM_FALLBACK_API_KEY", "")
+        fb_base = os.environ.get("LLM_FALLBACK_BASE_URL", "")
+        if fallback and fb_base and (fb_key or "localhost" in fb_base):
+            self.fallback = Grok(key=fb_key, model=os.environ.get("LLM_FALLBACK_MODEL", ""), base=fb_base, fallback=False)
+
+    @property
+    def configured(self):
+        return bool(self.key) or "localhost" in self.base or "127.0.0.1" in self.base
+
+    @property
+    def resting(self):
+        """Seconds left before we try the main model again after a quota/rate-limit answer."""
+        return max(0, int(self.cooldown_until - time.time()))
 
     @property
     def enabled(self):
-        return bool(self.key) or "localhost" in self.base or "127.0.0.1" in self.base
+        if not self.configured:
+            return False
+        return not self.resting or bool(self.fallback and self.fallback.enabled)
 
     @property
     def provider(self):
@@ -53,8 +71,12 @@ class Grok:
         return PROVIDERS.get(host, host)
 
     def status(self):
-        return {"enabled": self.enabled, "provider": self.provider, "model": self.model or None, "calls": self.calls,
-                "ok": self.ok, "last_error": self.last_error, "last_ok": self.last_ok}
+        st = {"enabled": self.enabled, "provider": self.provider, "model": self.last_model or self.model or None, "calls": self.calls,
+              "ok": self.ok, "last_error": self.last_error, "last_ok": self.last_ok, "resting": self.resting,
+              "main_model": self.model or None}
+        if self.fallback:
+            st["fallback"] = {"provider": self.fallback.provider, "model": self.fallback.model or None, "ok": self.fallback.ok}
+        return st
 
     def _req(self, method, path, body=None):
         headers = {"Content-Type": "application/json", "User-Agent": "squad-radar"}
@@ -83,8 +105,28 @@ class Grok:
         return self.model
 
     def chat(self, user, system=SYSTEM, json_mode=False, max_tokens=300):
-        if not self.enabled:
+        if not self.configured:
             return None
+        out = None if self.resting else self._chat(user, system, json_mode, max_tokens)
+        if out is None and self.resting and self.fallback and self.fallback.enabled:
+            out = self.fallback.chat(user, system, json_mode, max_tokens)
+            if out:
+                self.ok += 1
+                self.last_ok = time.time()
+                self.last_model = self.fallback.model
+                if not json_mode:
+                    self.recent = (self.recent + [out])[-20:]
+        return out
+
+    def _rest(self, code, detail, retry_after=""):
+        """The provider said slow down. Wait as long as it asks (or longer for a daily quota) before trying again."""
+        m = re.search(r'"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"', detail) or re.search(r"(?i)retry (?:in|after) (\d+(?:\.\d+)?)\s*s", detail)
+        wait = float(m.group(1)) + 2 if m else (float(retry_after) + 1 if str(retry_after).strip().replace(".", "", 1).isdigit() else 60)
+        if re.search(r"(?i)per ?day|daily|PerDay", detail):
+            wait = max(wait, 3600)
+        self.cooldown_until = time.time() + min(wait, 6 * 3600)
+
+    def _chat(self, user, system, json_mode, max_tokens):
         if json_mode and not self.json_native:
             user += "\n\nReply with one JSON object only, no other text."
         body = {"model": self.pick_model(), "messages": [{"role": "system", "content": system},
@@ -104,14 +146,20 @@ class Grok:
                     self.ok += 1
                     self.last_ok = time.time()
                     self.last_error = None
+                    self.last_model = self.model
                     if not json_mode:
                         self.recent = (self.recent + [out])[-20:]
                 else:
                     self.last_error = "the model returned an empty answer"
                 return out or None
             except urllib.error.HTTPError as e:
-                detail = e.read().decode(errors="replace")[:300]
+                full = e.read().decode(errors="replace")[:6000]
+                detail = full[:300]
                 self.last_error = "HTTP %d: %s" % (e.code, detail)
+                if e.code in (429, 503):
+                    self._rest(e.code, full, (e.headers or {}).get("Retry-After", "") if e.headers else "")
+                    self.last_error = ("HTTP %d: %s quota or rate limit reached, resting %d min" % (e.code, self.provider, max(1, self.resting // 60)))
+                    return None
                 # Some providers reject settings they don't know. Drop them once and retry.
                 drop = [k for k in ("reasoning_effort", "response_format") if k in body and k in detail]
                 if e.code == 400 and attempt == 0 and (drop or "response_format" in body or "reasoning_effort" in body):

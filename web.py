@@ -174,7 +174,11 @@ class App:
         if not st.get("enabled"):
             st["fix"] = ("No model key on this server. Set LLM_API_KEY (and LLM_BASE_URL, LLM_MODEL) in the host's "
                          "environment variables, not in .env, then redeploy.")
-        elif st.get("last_error"):
+        elif st.get("resting"):
+            st["fix"] = ("The model's free quota is used up for now. The bot keeps working on built-in replies and tries again in "
+                         "about %d min. Add LLM_FALLBACK_BASE_URL / LLM_FALLBACK_API_KEY / LLM_FALLBACK_MODEL for a backup model."
+                         % max(1, st["resting"] // 60))
+        elif st.get("last_error") and not st.get("ok"):
             st["fix"] = "The key is set but the model call failed. Check the key is correct and has no spaces or quotes."
         return st
 
