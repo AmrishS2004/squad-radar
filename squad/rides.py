@@ -112,6 +112,7 @@ class RidesMixin:
             lines.append("⚠️ no seat yet: %s. split an Uber or another driver?" % ", ".join(waitlist))
         lines.append("riders chip in ~$3-5 for gas 🙏 drivers reply \"ok\" to confirm")
         r["assign"], r["status"] = assign, "matched"
+        self.log_event(st, "rides")
         return [self.say(cid, "\n".join(lines))]
 
     # ----- airport rides before breaks -----

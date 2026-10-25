@@ -173,6 +173,7 @@ class MoneyMixin:
             for k, n in enumerate(sorted(owners)):
                 per[n] = per.get(n, 0) + each + (1 if k < extra else 0)
         shares = split_costs(per, b["tax"], b["tip"])
+        self.log_event(st, "bill", sum(shares.values()))
         rows = self.add_owes(st, b["payer"], shares, "squad bill")
         lines = ["🧾 split done:"] + ["- %s: %s" % (n, fmt(c)) for n, c in sorted(shares.items())]
         if rows:

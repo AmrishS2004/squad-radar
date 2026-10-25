@@ -40,6 +40,16 @@ SEND_FILE = '''on run argv
 end run'''
 
 
+TAPBACKS = {0: "love", 1: "like", 2: "dislike", 3: "laugh", 4: "emphasize", 5: "question", 6: "emoji"}
+
+
+def tapback_target(aguid):
+    """associated_message_guid looks like 'p:0/GUID' or 'bp:GUID'; we want the GUID."""
+    if not aguid:
+        return ""
+    return aguid.split("/", 1)[1] if "/" in aguid else aguid.split(":", 1)[-1]
+
+
 def decode_attributed_body(blob):
     """Newer macOS stores message text in an NSAttributedString blob instead of the text column."""
     if not blob:
@@ -108,10 +118,13 @@ class IMessage:
         if self.last is None:
             self.start()
         q = """SELECT m.ROWID, m.text, m.attributedBody, m.is_from_me, h.id, c.guid, c.display_name, m.date,
-                      (SELECT COUNT(*) FROM chat_handle_join x WHERE x.chat_id = c.ROWID)
+                      (SELECT COUNT(*) FROM chat_handle_join x WHERE x.chat_id = c.ROWID),
+                      m.guid, IFNULL(m.associated_message_type, 0), m.associated_message_guid
                FROM message m JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
                JOIN chat c ON c.ROWID = cmj.chat_id LEFT JOIN handle h ON h.ROWID = m.handle_id
-               WHERE m.ROWID > ? AND IFNULL(m.associated_message_type, 0) = 0 ORDER BY m.ROWID"""
+               WHERE m.ROWID > ? AND (IFNULL(m.associated_message_type, 0) = 0
+                     OR m.associated_message_type BETWEEN 2000 AND 2006
+                     OR m.associated_message_type BETWEEN 3000 AND 3006) ORDER BY m.ROWID"""
         with self._conn() as c:
             rows = c.execute(q, (self.last,)).fetchall()
         out = []
@@ -127,8 +140,17 @@ class IMessage:
                             atts.setdefault(mid, []).append(os.path.expanduser(fn))
             except sqlite3.Error:
                 pass
-        for rid, text, body, from_me, handle, guid, name, date, n in rows:
+        for rid, text, body, from_me, handle, guid, name, date, n, mguid, atype, aguid in rows:
             self.last = max(self.last, rid)
+            if atype:
+                is_group = n > 1
+                if is_group and (name or "").lower() not in self.allow and guid.lower() not in self.allow:
+                    continue
+                out.append({"kind": "reaction", "chat_id": guid, "chat_name": name or "", "from_me": bool(from_me),
+                            "sender": "me" if from_me else (handle or "unknown"), "is_group": is_group,
+                            "reaction": TAPBACKS.get(atype % 1000, "like"), "removed": atype >= 3000,
+                            "target": tapback_target(aguid), "text": "", "ts": apple_time(date), "attachments": []})
+                continue
             text = text or decode_attributed_body(body) or ""
             text = text.replace("\ufffc", "").strip()  # attachment placeholder character
             if not text and not atts.get(rid):
@@ -136,7 +158,7 @@ class IMessage:
             is_group = n > 1
             if is_group and (name or "").lower() not in self.allow and guid.lower() not in self.allow:
                 continue  # never read chats that aren't on the allowlist
-            out.append({"chat_id": guid, "chat_name": name or "", "text": text, "from_me": bool(from_me),
+            out.append({"chat_id": guid, "chat_name": name or "", "text": text, "from_me": bool(from_me), "guid": mguid,
                         "sender": "me" if from_me else (handle or "unknown"), "is_group": is_group,
                         "ts": apple_time(date), "attachments": atts.get(rid, [])})
         return out

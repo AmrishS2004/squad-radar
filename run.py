@@ -6,10 +6,13 @@
   python3 run.py imessage   run the bot in the group chats named in .env
   python3 run.py sim        chat with the bot in your terminal as any of the sample friends
   python3 run.py demo       play the scripted demo and write demo_transcript.md
+  python3 run.py llm        make one live call to the language model to prove it's connected
+  python3 web.py            run the web app (http://localhost:8080)
 """
 import glob
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime, timedelta
@@ -23,12 +26,20 @@ from squad.llm import Grok  # noqa: E402
 
 
 def load_env(path=os.path.join(HERE, ".env")):
-    if os.path.exists(path):
-        for line in open(path, encoding="utf-8"):
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    """Read .env. A filled-in value always beats an empty one, so a blank line earlier in the file can't hide your key.
+    Values already set in the real environment (Railway variables, your shell) win over the file."""
+    if not os.path.exists(path):
+        return
+    for line in open(path, encoding="utf-8-sig"):
+        line = line.strip()
+        if line.startswith("export "):
+            line = line[7:].strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        k, v = k.strip(), v.split(" #")[0].strip().strip('"').strip("'")
+        if v and not os.environ.get(k):
+            os.environ[k] = v
 
 
 def load_profiles(d):
@@ -60,6 +71,7 @@ def cmd_chats():
     print("Recent chats (use the name, or the guid if it has no name, in SQUAD_CHATS):")
     for guid, name, ident, n, last in im.list_chats():
         print("  %-28s %-40s %d people" % ((name or "(no name)")[:28], guid, n))
+    print("\nNo group? Text yourself once, then put your own number or email in SQUAD_TEST_CHAT (solo test mode).")
     return 0
 
 
@@ -76,8 +88,11 @@ def cmd_check():
     prof = load_profiles(os.path.join(HERE, os.environ.get("SQUAD_PROFILES", "profiles")))
     print("OK   %d profiles: %s" % (len(prof), ", ".join(prof)))
     chats = [c for c in os.environ.get("SQUAD_CHATS", "").split(",") if c.strip()]
-    print(("OK   " if chats else "FAIL ") + "SQUAD_CHATS: %s" % (", ".join(chats) or "not set (run: python3 run.py chats)"))
-    ok_all &= bool(chats)
+    test = os.environ.get("SQUAD_TEST_CHAT", "")
+    print(("OK   " if chats or test else "FAIL ") + "SQUAD_CHATS: %s" % (", ".join(chats) or "not set (run: python3 run.py chats)"))
+    if test:
+        print("OK   solo test mode in: %s" % test)
+    ok_all &= bool(chats or test)
     g = Grok()
     if g.enabled:
         reply = g.chat("Say hi to the squad in five words.")
@@ -91,8 +106,8 @@ def cmd_imessage():
     load_env()
     from squad.imessage import IMessage
     chats = [c for c in os.environ.get("SQUAD_CHATS", "").split(",") if c.strip()]
-    if not chats:
-        print("Set SQUAD_CHATS in .env first (python3 run.py chats shows the names).")
+    if not chats and not os.environ.get("SQUAD_TEST_CHAT"):
+        print("Set SQUAD_CHATS (a group) or SQUAD_TEST_CHAT (the chat with yourself) in .env first. python3 run.py chats shows them.")
         return 1
     separate = os.environ.get("SQUAD_ACCOUNT", "own").lower() == "separate"
     prefix = "" if separate else os.environ.get("SQUAD_PREFIX", "🤖 ")
@@ -104,26 +119,24 @@ def cmd_imessage():
         print("Can't read Messages: %s. Give Terminal Full Disk Access and reopen it." % why)
         return 1
     im.start()
-    print("Squad Radar is listening in: %s (Ctrl+C to stop)" % ", ".join(chats))
-    members_cache = {}
+    test = os.environ.get("SQUAD_TEST_CHAT", "").strip()
+    if test and not prefix:
+        prefix = "🤖 "  # texting yourself: the prefix is how it tells its own replies apart
+        bot.prefix = prefix
+    cfg = {"prefix": prefix, "separate": separate, "test": test, "members": {}, "seen": {}}
+    print("Squad Radar is listening in: %s (Ctrl+C to stop)" % (", ".join(chats) or "your chat with yourself"))
+    if test:
+        print("Solo test mode: text yourself. 'as Priya: anyone free sat?' plays a sample friend, "
+              "'dm: squad budget 10' (or 'as Jake dm: ...') is a private setup DM.")
     last_tick = 0
     while True:
         try:
             for m in im.fetch():
-                if m["from_me"] and (separate or (prefix and m["text"].startswith(prefix.strip()))):
-                    continue  # the bot's own messages
-                if m["is_group"]:
-                    if m["chat_id"] not in members_cache:
-                        members_cache[m["chat_id"]] = im.members(m["chat_id"])
-                    m["members"] = members_cache[m["chat_id"]]
-                else:
-                    m["members"] = [m["sender"]]
-                for o in bot.on_message(m):
-                    deliver(im, o)
+                route(bot, im, m, cfg)
             if time.time() - last_tick > 30:
                 last_tick = time.time()
                 for o in bot.tick():
-                    deliver(im, o)
+                    deliver(im, o, cfg)
             time.sleep(2)
         except KeyboardInterrupt:
             print("\nbye")
@@ -133,14 +146,84 @@ def cmd_imessage():
             time.sleep(5)
 
 
-def deliver(im, o):
+def same_person(chat_id, handle):
+    """Does this 1:1 chat id (any;-;+14805551234 / iMessage;-;me@icloud.com) belong to this phone/email?"""
+    a = chat_id.split(";")[-1].strip().lower()
+    b = handle.strip().lower()
+    if "@" in a or "@" in b:
+        return a == b
+    da, db = re.sub(r"\D", "", a), re.sub(r"\D", "", b)
+    return len(db) >= 7 and da[-10:] == db[-10:]
+
+
+def route(bot, im, m, cfg):
+    if cfg["prefix"] and m["text"].startswith(cfg["prefix"].strip()):
+        return  # the bot's own messages (and their echoes)
+    if m["from_me"] and cfg["separate"] and not cfg["test"]:
+        return
+    if cfg["test"] and not m["is_group"] and same_person(m["chat_id"], cfg["test"]):
+        # texting yourself saves each message twice (sent + received); handle the first copy only
+        key = m["text"] or "react:%s:%s:%s" % (m.get("target"), m.get("reaction"), m.get("removed"))
+        now = time.time()
+        cfg["seen"] = {k: t for k, t in cfg["seen"].items() if now - t < 20}
+        if key in cfg["seen"]:
+            return
+        cfg["seen"][key] = now
+        cfg["self_chat"], cfg["bot"] = m["chat_id"], bot
+        solo_test(bot, m)
+        for o in bot.on_message(m):
+            deliver(im, o, cfg)
+        return
+    if m["is_group"]:
+        if m["chat_id"] not in cfg["members"]:
+            cfg["members"][m["chat_id"]] = im.members(m["chat_id"])
+        m["members"] = cfg["members"][m["chat_id"]]
+    else:
+        m["members"] = [m["sender"]]
+    for o in bot.on_message(m):
+        deliver(im, o, cfg)
+
+
+def solo_test(bot, m):
+    """Turn the chat with yourself into a pretend group of you + the sample friends."""
+    m["from_me"], m["sender"] = True, "me"
+    mt = re.match(r"^\s*as\s+([A-Za-z]+)\s*(dm)?\s*:\s*(.+)$", m["text"], re.S | re.I)
+    dm = re.match(r"^\s*dm\s*:\s*(.+)$", m["text"], re.S | re.I)
+    if mt:
+        for p in bot.profiles.values():
+            if p["name"].lower() == mt.group(1).lower() and p.get("handles"):
+                m["sender"], m["from_me"] = p["handles"][0], p["handles"][0] == "me"
+                break
+        m["text"] = mt.group(3).strip()
+        dm = dm or (mt.group(2) and True)
+    elif dm:
+        m["text"] = dm.group(1).strip()
+    if dm:
+        m["is_group"], m["members"], m["chat_id"] = False, [m["sender"]], "dm:" + m["sender"]
+    else:
+        m["is_group"] = True
+        m["members"] = ["me"] + [p["handles"][0] for p in bot.profiles.values() if p.get("handles") and p["handles"][0] != "me"]
+    return m
+
+
+def deliver(im, o, cfg=None):
     print(">>", ("[DM %s] " % o["dm"]) if o.get("dm") else "", o.get("text") or ("[file] " + o.get("file", "")))
+    target = o.get("chat_id", "")
+    if cfg and cfg.get("test") and (o.get("dm") or target.startswith("dm:")):
+        # solo test mode: private DMs show up in your own chat, labeled, and never go to the sample phone numbers
+        own = cfg.get("self_chat")
+        if own and o.get("text"):
+            who = o.get("dm") or target[3:]
+            name = cfg["bot"].name_of(who) if cfg.get("bot") else who
+            text = o["text"][len(cfg["prefix"]):] if o["text"].startswith(cfg["prefix"]) else o["text"]
+            im.send_text(own, "%s[private DM to %s] %s" % (cfg["prefix"], name, text))
+        return
     if o.get("dm"):
         im.send_dm(o["dm"], o["text"])
     elif o.get("file"):
-        im.send_file(o["chat_id"], o["file"])
+        im.send_file(target, o["file"])
     else:
-        im.send_text(o["chat_id"], o["text"])
+        im.send_text(target, o["text"])
 
 
 # ---------- simulator ----------
@@ -159,6 +242,8 @@ def cmd_sim():
     members = sim_members(bot)
     names = {p["name"].lower(): p["handles"][0] for p in bot.profiles.values()}
     print("Group chat 'Squad' with %s. Type 'Name: message'. '+2h' moves time forward. 'quit' to stop." % ", ".join(bot.profiles))
+    print("Tapbacks: 'Sam: react ‼️ landlord' (‼️ pins it). Voice notes are saved in out/.")
+    seq = 0
     print("It's %s." % clock["now"].strftime("%a %b %d, %I:%M %p"))
     while True:
         try:
@@ -182,13 +267,30 @@ def cmd_sim():
         if not h:
             print("   who's that? one of: %s" % ", ".join(bot.profiles))
             continue
-        for o in bot.on_message({"chat_id": "sim-squad", "text": text.strip(), "sender": h, "members": members, "is_group": True}):
+        text = text.strip()
+        rm = re.match(r"^react\s+(\S+)\s+(.+)$", text)
+        if rm:  # "Sam: react ‼️ landlord" = a tapback on the latest message containing "landlord"
+            hist = bot.state.get("sim-squad", {}).get("history", [])
+            target = next((x for x in reversed(hist) if rm.group(2).lower() in x["text"].lower()), None)
+            if not target:
+                print("   no message with \"%s\"" % rm.group(2))
+                continue
+            kind = {"‼️": "emphasize", "!!": "emphasize", "❤️": "love", "👍": "like", "😂": "laugh", "👎": "dislike", "❓": "question"}.get(rm.group(1), "like")
+            bot.on_message({"kind": "reaction", "chat_id": "sim-squad", "sender": h, "members": members, "is_group": True,
+                            "target": target.get("guid"), "reaction": kind, "text": ""})
+            print("   (%s tapped %s on %s's message)" % (who.strip(), rm.group(1), target["who"]))
+            continue
+        seq += 1
+        for o in bot.on_message({"chat_id": "sim-squad", "text": text, "sender": h, "members": members, "is_group": True,
+                                 "guid": "sim-%d" % seq}):
             print_out(o)
 
 
 def print_out(o):
     if o.get("dm"):
         print("   🤖 (private DM to %s) %s" % (o["dm"], o["text"]))
+    elif o.get("file", "").endswith((".m4a", ".wav", ".aiff")):
+        print("   🤖 [voice note: %s]" % o["file"])
     elif o.get("file"):
         print("   🤖 [calendar invite: %s]" % os.path.basename(o["file"]))
     else:
@@ -269,6 +371,23 @@ DEMO = [
     ("2026-12-11T12:06", "Sam", "@squad add oat milk, paper towels"),
     ("2026-12-11T12:30", "Jake", "got paper towels"),
     ("2026-12-11T12:35", "Sam", "@squad this or that"),
+    ("## Group radar: what matters, who tagged you, voice notes, stats", None, None),
+    ("2026-12-11T13:00", "Priya", "heads up the landlord moved the move-out inspection to mon 10am, clean your rooms"),
+    ("2026-12-11T13:01", "Jake", "noooo"),
+    ("2026-12-11T13:01", "Sam", "💀💀"),
+    ("2026-12-11T13:02", "Sam", "‼️", "react", "landlord moved"),
+    ("2026-12-11T13:02", "Jake", "❤️", "react", "landlord moved"),
+    ("2026-12-11T13:05", "Priya", "@jake can you return the router before you fly out?"),
+    ("2026-12-11T13:10", "Jake", "lol"),
+    ("2026-12-11T13:12", "Amrish", "final electric bill is $84, i'll split it tonight"),
+    ("2026-12-11T13:20", "Sam", "does anyone have a vacuum i can borrow?"),
+    ("2026-12-11T16:30", None, "tick"),
+    ("2026-12-11T17:00", "Jake", "@squad highlights"),
+    ("2026-12-11T17:01", "Jake", "remind #1 tomorrow"),
+    ("2026-12-11T17:02", "Jake", "@squad mentions"),
+    ("2026-12-11T17:03", "Jake", "@squad voice highlights"),
+    ("2026-12-11T17:05", "Priya", "@squad stats"),
+    ("2026-12-11T17:06", "Sam", "@squad wrapped"),
 ]
 
 
@@ -302,6 +421,14 @@ def cmd_demo():
     bot.profiles = json.loads(json.dumps(bot.profiles))
     bot.profile_dir = None
     members = sim_members(bot)
+    seq, spoken = [0], []
+
+    def demo_tts(text, path, lang):  # the real bot uses the Mac's voices; the transcript shows what it would say
+        spoken.append(text)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        open(path, "w").write(text)
+        return path
+    bot.tts = demo_tts
     handle = {p["name"]: p["handles"][0] for p in bot.profiles.values()}
     names = {v: k for k, v in handle.items()}
     md = ["# Squad Radar demo", "",
@@ -318,15 +445,25 @@ def cmd_demo():
             outs = bot.tick()
             if outs:
                 md.append("*%s*" % stamp)
+        elif len(row) > 3 and row[3] == "react":
+            target = next((x for x in reversed(bot.state.get("demo", {}).get("history", [])) if row[4] in x["text"]), None)
+            md.append("*%s tapped %s on %s's message*" % (who, text, target["who"] if target else "a"))
+            kind = {"‼️": "emphasize", "❤️": "love", "👍": "like", "😂": "laugh"}.get(text, "like")
+            outs = bot.on_message({"kind": "reaction", "chat_id": "demo", "sender": handle[who], "members": members, "is_group": True,
+                                   "target": target.get("guid") if target else "", "reaction": kind, "text": ""})
         elif len(row) > 3 and row[3] == "dm":
             md.append("**%s** (private DM to the bot, %s): %s" % (who, stamp, text))
             outs = bot.on_message({"chat_id": "dm-" + who, "text": text, "sender": handle[who], "members": [handle[who]], "is_group": False})
         else:
             md.append("**%s** (%s): %s" % (who, stamp, text.replace("\n", "  \n")))
-            outs = bot.on_message({"chat_id": "demo", "text": text, "sender": handle[who], "members": members, "is_group": True})
+            seq[0] += 1
+            outs = bot.on_message({"chat_id": "demo", "text": text, "sender": handle[who], "members": members, "is_group": True,
+                                   "guid": "demo-%d" % seq[0]})
         for o in outs:
             if o.get("dm"):
                 md.append("> 🤖 🔒 *private DM to %s:* %s" % (names.get(o["dm"], o["dm"]), o["text"]))
+            elif o.get("file", "").endswith((".m4a", ".wav", ".aiff")):
+                md.append("> 🤖 🔊 *voice note (audio file). It says:* \"%s\"" % spoken[-1] if spoken else "> 🤖 🔊 *voice note*")
             elif o.get("file"):
                 md.append("> 🤖 📅 *calendar invite: %s*" % os.path.basename(o["file"]))
             else:
@@ -339,9 +476,52 @@ def cmd_demo():
     return 0
 
 
+def cmd_llm():
+    """Prove the language model is really connected: one live call, timed."""
+    load_env()
+    g = Grok()
+    st = g.status()
+    if not st["enabled"]:
+        env = os.path.join(HERE, ".env")
+        print("No model key found.")
+        if not os.path.exists(env):
+            print("- There is no .env file in %s. Run: cp .env.example .env  then fill in your key." % HERE)
+            if [f for f in os.listdir(HERE) if f.startswith(".env") and f != ".env.example"]:
+                print("- Found these instead: %s (it must be named exactly .env)" % ", ".join(f for f in os.listdir(HERE) if f.startswith(".env")))
+        else:
+            seen = {}
+            for i, line in enumerate(open(env, encoding="utf-8-sig"), 1):
+                m = re.match(r"^\s*(?:export\s+)?(XAI_API_KEY|LLM_API_KEY|LLM_BASE_URL|LLM_MODEL)\s*=\s*(.*)$", line)
+                if m:
+                    seen.setdefault(m.group(1), []).append((i, "filled" if m.group(2).strip() else "empty"))
+            for k in ("XAI_API_KEY", "LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL"):
+                print("- %s: %s" % (k, ", ".join("line %d %s" % x for x in seen.get(k, [])) or "missing"))
+            print("Put your key after LLM_API_KEY= (Gemini, Groq, OpenRouter...) or XAI_API_KEY= (Grok), save the file, and run this again.")
+        return 1
+    print("Provider: %s (%s)" % (st["provider"], g.base))
+    model = g.pick_model()
+    print("Model: %s%s (time limit %ds)" % (model, ", thinking effort " + g.effort if g.effort else "", g.timeout))
+    t0 = time.time()
+    out = g.chat("Say hi to the squad in under 10 words.")
+    if not out:
+        print("FAIL model %s did not answer: %s" % (model, g.last_error))
+        if "timed out" in str(g.last_error):
+            print("     It's too slow. Try a faster model in .env, for example LLM_MODEL=gemini-3.5-flash-lite")
+        if "404" in str(g.last_error) or "not found" in str(g.last_error).lower():
+            print("     That model name isn't available to your key. Check LLM_MODEL in .env.")
+        return 1
+    print("OK   answered in %.1fs: %s" % (time.time() - t0, out))
+    t0 = time.time()
+    j = g.json('Message: "anyone free saturday night?"', __import__("squad.llm", fromlist=["INTENT_SYSTEM"]).INTENT_SYSTEM)
+    print(("OK   " if j else "FAIL ") + "JSON answer in %.1fs: %s" % (time.time() - t0, j or g.last_error))
+    if j and time.time() - t0 > 8:
+        print("     Works, but slow for a group chat. A lighter model will feel snappier.")
+    return 0 if j else 1
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
-    fn = {"chats": cmd_chats, "check": cmd_check, "imessage": cmd_imessage, "sim": cmd_sim, "demo": cmd_demo}.get(cmd)
+    fn = {"chats": cmd_chats, "check": cmd_check, "imessage": cmd_imessage, "sim": cmd_sim, "demo": cmd_demo, "llm": cmd_llm}.get(cmd)
     if not fn:
         print(__doc__)
         sys.exit(0)

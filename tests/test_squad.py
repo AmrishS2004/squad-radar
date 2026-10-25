@@ -172,7 +172,7 @@ tmp = tempfile.mkdtemp()
 db = os.path.join(tmp, "chat.db")
 c = sqlite3.connect(db)
 c.executescript("""
-CREATE TABLE message (ROWID INTEGER PRIMARY KEY, text TEXT, attributedBody BLOB, is_from_me INT, handle_id INT, date INT, associated_message_type INT);
+CREATE TABLE message (ROWID INTEGER PRIMARY KEY, text TEXT, attributedBody BLOB, is_from_me INT, handle_id INT, date INT, associated_message_type INT, guid TEXT, associated_message_guid TEXT);
 CREATE TABLE chat (ROWID INTEGER PRIMARY KEY, guid TEXT, display_name TEXT, chat_identifier TEXT);
 CREATE TABLE chat_message_join (chat_id INT, message_id INT);
 CREATE TABLE chat_handle_join (chat_id INT, handle_id INT);
@@ -180,24 +180,30 @@ CREATE TABLE handle (ROWID INTEGER PRIMARY KEY, id TEXT);
 INSERT INTO handle VALUES (1, '+14805550101'), (2, '+14805550102');
 INSERT INTO chat VALUES (1, 'any;+;chat111', 'Squad', 'chat111'), (2, 'any;+;chat222', 'Family', 'chat222'), (3, 'any;-;+14805550101', '', '+14805550101');
 INSERT INTO chat_handle_join VALUES (1,1),(1,2),(2,1),(2,2),(3,1);
-INSERT INTO message VALUES (1, 'old', NULL, 0, 1, 1, 0);
+INSERT INTO message VALUES (1, 'old', NULL, 0, 1, 1, 0, 'G1', NULL);
 INSERT INTO chat_message_join VALUES (1,1);
 """)
 c.commit()
 im = IMessage(["Squad"], db=db)
 im.start()
 c.executescript("""
-INSERT INTO message VALUES (2, 'anyone free?', NULL, 0, 1, 783000000000000000, 0);
-INSERT INTO message VALUES (3, 'family stuff', NULL, 0, 2, 783000000000000000, 0);
-INSERT INTO message VALUES (4, NULL, X'%s', 0, 2, 783000000000000000, 0);
-INSERT INTO message VALUES (5, 'Loved “anyone free?”', NULL, 0, 2, 783000000000000000, 2000);
-INSERT INTO message VALUES (6, 'squad setup', NULL, 0, 1, 783000000000000000, 0);
-INSERT INTO chat_message_join VALUES (1,2),(2,3),(1,4),(1,5),(3,6);
+INSERT INTO message VALUES (2, 'anyone free?', NULL, 0, 1, 783000000000000000, 0, 'G2', NULL);
+INSERT INTO message VALUES (3, 'family stuff', NULL, 0, 2, 783000000000000000, 0, 'G3', NULL);
+INSERT INTO message VALUES (4, NULL, X'%s', 0, 2, 783000000000000000, 0, 'G4', NULL);
+INSERT INTO message VALUES (5, 'Loved “anyone free?”', NULL, 0, 2, 783000000000000000, 2000, 'G5', 'p:0/G2');
+INSERT INTO message VALUES (7, 'Emphasized “family stuff”', NULL, 0, 1, 783000000000000000, 2004, 'G7', 'bp:G3');
+INSERT INTO message VALUES (6, 'squad setup', NULL, 0, 1, 783000000000000000, 0, 'G6', NULL);
+INSERT INTO chat_message_join VALUES (1,2),(2,3),(1,4),(1,5),(3,6),(2,7);
 """ % blob.hex())
 c.commit()
 got = im.fetch()
-check("reads only allowlisted group + DMs, skips tapbacks and old messages",
+reacts = [g for g in got if g.get("kind") == "reaction"]
+got = [g for g in got if g.get("kind") != "reaction"]
+check("reads only allowlisted group + DMs, skips old messages",
       [g["text"] for g in got] == ["anyone free?", "anyone free??", "squad setup"], [g["text"] for g in got])
+check("tapbacks come through as reactions with the target message, only from allowlisted chats",
+      [(r["reaction"], r["target"], r["removed"]) for r in reacts] == [("love", "G2", False)], reacts)
+check("messages carry their guid so reactions can find them", got[0]["guid"] == "G2", got[0])
 check("group flag and members", got[0]["is_group"] and not got[2]["is_group"] and set(im.members("any;+;chat111")) == {"+14805550101", "+14805550102", "me"})
 check("no new messages on second fetch", im.fetch() == [])
 
@@ -235,9 +241,7 @@ class Fake(BaseHTTPRequestHandler):
 
 srv = HTTPServer(("127.0.0.1", 0), Fake)
 threading.Thread(target=srv.serve_forever, daemon=True).start()
-import squad.llm as L  # noqa: E402
-L.API = "http://127.0.0.1:%d/v1" % srv.server_address[1]
-g = Grok(key="test-key")
+g = Grok(key="test-key", base="http://127.0.0.1:%d/v1" % srv.server_address[1])
 check("picks a fast grok model, skips image models", g.pick_model() == "grok-4-fast-non-reasoning", g.model)
 check("sends bearer key", calls[0][2] == "Bearer test-key")
 b3, clock3 = new_bot(now, llm=g)
@@ -250,8 +254,8 @@ out = send(b3, "Amrish", "@squad suggest", chat="g3")
 check("grok suggests tasks and bad hours are cleaned", "survey design" in texts(out) and b3.state["g3"]["project"]["tasks"][1]["hours"] == 2.0, out)
 no_key = Grok(key="")
 check("no key: llm disabled, no network", no_key.chat("hi") is None)
-L.API = "http://127.0.0.1:9/v1"
-dead = Grok(key="k", model="grok-3", timeout=2)
+check("successful calls are counted so the app can show the model is live", g.ok >= 3 and g.status()["provider"] == "127.0.0.1" or g.status()["provider"] == "local model", g.status())
+dead = Grok(key="k", model="grok-3", timeout=2, base="http://127.0.0.1:9/v1")
 check("unreachable API returns None instead of crashing", dead.chat("hi") is None and dead.last_error)
 srv.shutdown()
 

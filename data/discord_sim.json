@@ -1,0 +1,100 @@
+{
+  "about": "Demo dataset for '@squad simulate'. Each channel is created in Discord and these messages are posted by persona webhooks, one at a time, so Squad Radar reacts as if real friends were chatting. {you} becomes a mention of whoever started the simulation. 'react' steps add a reaction to an earlier message ('to': -1 is the message just before). 'pause' is seconds to wait after a step. Edit freely.",
+  "category": "Squad Radar demo",
+  "personas": [
+    {"name": "Priya", "profile": "priya"},
+    {"name": "Jake", "profile": "jake"},
+    {"name": "Sam", "profile": "sam"},
+    {"name": "Maya", "profile": {
+      "share_reasons": false,
+      "classes": [{"days": "TTh", "start": "13:30", "end": "14:45", "label": "SPA 202"}],
+      "busy": [], "exams": [],
+      "prefs": {"earliest": "10:00", "latest": "23:30", "budget": 20, "language": "spanish", "dorm": "manzanita", "venmo": "maya-g"},
+      "project": {"hours_this_week": 5, "skills": ["design", "slides"], "avoid": []}
+    }}
+  ],
+  "channels": [
+    {
+      "name": "apartment-4b",
+      "topic": "Roommates: rent, chores, groceries, bills",
+      "messages": [
+        {"who": "Priya", "text": "ok real talk rent is due on the 1st, venmo me $640 by friday"},
+        {"who": "Jake", "text": "bet"},
+        {"who": "Sam", "text": "who ate my leftovers 💀"},
+        {"who": "Jake", "text": "not me lol"},
+        {"who": "Priya", "text": "heads up the landlord moved the inspection to monday 10am, clean your rooms"},
+        {"who": "Sam", "react": "📌", "to": -1},
+        {"who": "Jake", "react": "❤️", "to": -1},
+        {"who": "Priya", "text": "@squad chores dishes, trash, bathroom, vacuum"},
+        {"who": "Jake", "text": "@squad add oat milk, paper towels, dish soap"},
+        {"who": "Sam", "text": "does anyone have a vacuum i can borrow?"},
+        {"who": "Priya", "text": "@squad bill tax 8% tip 18%\nPriya: pad thai 15\nJake: green curry 14\nSam: drunken noodles 13\nshared: spring rolls 9"},
+        {"who": "Jake", "text": "paid"},
+        {"who": "Priya", "text": "@{you} can you take the trash out tonight?"},
+        {"who": "Sam", "text": "@squad food run kung fu tea 10"},
+        {"who": "Jake", "text": "+ taro milk tea $6.50"},
+        {"who": "Priya", "text": "+ mango slush $5"}
+      ]
+    },
+    {
+      "name": "weekend-plans",
+      "topic": "Hangouts that fit everyone's classes",
+      "messages": [
+        {"who": "Jake", "text": "anyone free this weekend??", "pause": 2},
+        {"who": "Priya", "text": "1"},
+        {"who": "Sam", "text": "1"},
+        {"who": "Maya", "text": "1"},
+        {"who": "Priya", "text": "in"},
+        {"who": "Sam", "text": "in"},
+        {"who": "Maya", "text": "in", "pause": 2},
+        {"who": "Sam", "text": "@squad decide tacos, sushi, pizza"},
+        {"who": "Jake", "text": "who's driving to the game next week? i have 3 seats"},
+        {"who": "Maya", "text": "@{you} you coming saturday?"}
+      ]
+    },
+    {
+      "name": "cse-310-project",
+      "topic": "Group project: fair splits, check-ins, receipts",
+      "messages": [
+        {"who": "Priya", "text": "@squad project cse 310 app due 11/20"},
+        {"who": "Priya", "text": "@squad tasks wireframes 3h, backend api 5h, testing 2h, demo slides 2h"},
+        {"who": "Jake", "text": "dibs backend api"},
+        {"who": "Maya", "text": "dibs wireframes"},
+        {"who": "Priya", "text": "@squad split", "pause": 2},
+        {"who": "Jake", "text": "ok"},
+        {"who": "Maya", "text": "ok"},
+        {"who": "Priya", "text": "ok"},
+        {"who": "Sam", "text": "ok"},
+        {"who": "Maya", "text": "done wireframes"},
+        {"who": "Priya", "text": "@{you} can you look over the demo slides before we submit?"}
+      ]
+    },
+    {
+      "name": "move-out-market",
+      "topic": "Selling stuff before move-out, with fair holds",
+      "messages": [
+        {"who": "Jake", "text": "@squad sell IKEA desk $40, mini fridge $50 obo, desk lamp $10 pickup by sunday @ Tooker"},
+        {"who": "Sam", "text": "want #1"},
+        {"who": "Maya", "text": "want #1"},
+        {"who": "Priya", "text": "offer #2 $40"},
+        {"who": "Jake", "text": "accept #2 priya"},
+        {"who": "Maya", "text": "@squad looking for bike under $90"},
+        {"who": "Sam", "text": "selling my road bike, 80 bucks, pickup by friday"},
+        {"who": "Sam", "text": "list it"},
+        {"who": "Jake", "text": "sold #3 to maya"}
+      ]
+    },
+    {
+      "name": "intl-friends",
+      "topic": "Auto-translation for friends who text in other languages",
+      "messages": [
+        {"who": "Priya", "text": "@squad translate on"},
+        {"who": "Maya", "text": "¿alguien quiere ir al cine el sábado? 🎬"},
+        {"who": "Jake", "text": "yesss what time"},
+        {"who": "Maya", "text": "a las 7 en Harkins Tempe Marketplace, yo compro las palomitas"},
+        {"who": "Priya", "text": "kal ka plan kya hai yaar, chalo boba ke baad?"},
+        {"who": "Sam", "text": "@squad translate see you at 7, I'll bring snacks to spanish"}
+      ]
+    }
+  ]
+}

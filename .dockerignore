@@ -1,0 +1,11 @@
+.env
+.git
+data-web
+state
+out
+__pycache__
+*.pyc
+docs/*.gif
+.venv
+venv
+data-discord

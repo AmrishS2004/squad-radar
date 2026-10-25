@@ -1,0 +1,162 @@
+{
+  "about": "Extra groups for the live Discord demo. '@squad simulate' creates each as a channel, posts its seed messages, then live mode keeps the conversation going: the language model writes the next messages in character (or, with no model key, it picks from 'lines'). Personas get simple class schedules so the planner has real conflicts to work around.",
+  "personas": {
+    "Ava":    {"vibe": "organized floor RA type, plans everything, a little bossy", "classes": [["MWF", "09:00", "09:50", "PSY 101"]], "dorm": "tooker"},
+    "Marcus": {"vibe": "gym and soccer guy, funny, always hungry", "classes": [["TTh", "10:30", "11:45", "KIN 230"]], "dorm": "tooker"},
+    "Lena":   {"vibe": "chill art major, sarcastic, night owl", "classes": [["MW", "13:30", "14:45", "ART 112"]], "dorm": "barrett"},
+    "Diego":  {"vibe": "soccer captain, bilingual, texts in spanish sometimes", "classes": [["TTh", "12:00", "13:15", "SPA 313"]], "dorm": "manzanita", "language": "spanish"},
+    "Arjun":  {"vibe": "CS grad student, helpful, mixes hindi and english (hinglish)", "classes": [["MW", "16:30", "17:45", "CSE 310"]], "dorm": "vista del sol", "language": "hindi"},
+    "Wei":    {"vibe": "hackathon nerd, ships at 3am, says 'lgtm'", "classes": [["TTh", "15:00", "16:15", "CSE 340"]], "dorm": "hassayampa"},
+    "Noah":   {"vibe": "busy grad student, works shifts, dry humor", "classes": [["MW", "18:00", "19:15", "EEE 598"]], "dorm": "district", "busy": [["Sat", "12:00", "17:00", "work shift"]]},
+    "Kavya":  {"vibe": "runs Indian Students Association events, energetic, uses some tamil words (tanglish)", "classes": [["MWF", "11:00", "11:50", "BIO 181"]], "dorm": "adelphi", "language": "tamil"},
+    "Rohan":  {"vibe": "foodie, always organizing potlucks, hinglish", "classes": [["TTh", "09:00", "10:15", "ECN 211"]], "dorm": "district", "language": "hindi"}
+  },
+  "groups": [
+    {
+      "name": "dorm-floor-3",
+      "topic": "Tooker House floor 3",
+      "about": "a college dorm floor chat: floor meetings, noise, packages, shared kitchen, late night food runs",
+      "members": ["Ava", "Marcus", "Lena", "Diego"],
+      "seed": [
+        {"who": "Ava", "text": "floor meeting thursday 8pm in the lounge, it counts for room selection so pls come"},
+        {"who": "Marcus", "text": "who keeps leaving pizza boxes by the elevator 😭"},
+        {"who": "Lena", "text": "not me but i respect the commitment"}
+      ],
+      "lines": [
+        {"who": "Diego", "text": "anyone want insomnia cookies? i'm ordering in 10"},
+        {"who": "Ava", "text": "reminder: quiet hours start at 11 on weeknights"},
+        {"who": "Marcus", "text": "anyone free this weekend?? floor bowling night?"},
+        {"who": "Lena", "text": "@squad tldr"},
+        {"who": "Ava", "text": "@Marcus did you get the package that came for you? it's at the front desk"},
+        {"who": "Diego", "text": "selling my mini fridge, 45 bucks, pickup by friday"}
+      ]
+    },
+    {
+      "name": "cse-310-study",
+      "topic": "CSE 310 study group",
+      "about": "a data structures study group: midterm prep, practice problems, office hours, study sessions at Hayden Library",
+      "members": ["Priya", "Arjun", "Wei", "Sam"],
+      "seed": [
+        {"who": "Arjun", "text": "midterm is next wednesday, anyone want to grind practice problems at hayden?"},
+        {"who": "Wei", "text": "yes. heaps and graphs are my enemy"}
+      ],
+      "lines": [
+        {"who": "Priya", "text": "office hours moved to friday 2pm btw"},
+        {"who": "Sam", "text": "can someone explain dijkstra like i'm five"},
+        {"who": "Arjun", "text": "@squad plan study session this week"},
+        {"who": "Wei", "text": "lgtm, i'll bring the whiteboard markers"},
+        {"who": "Priya", "text": "@squad highlights"},
+        {"who": "Arjun", "text": "yaar the practice exam is way harder than the lectures"}
+      ]
+    },
+    {
+      "name": "intramural-soccer",
+      "topic": "Intramural soccer team",
+      "about": "an intramural soccer team chat: game times, rides to the rec fields, pinnies, team dinners",
+      "members": ["Jake", "Marcus", "Diego", "Noah"],
+      "seed": [
+        {"who": "Diego", "text": "game moved to thursday 9pm at the rec fields ⚽"},
+        {"who": "Jake", "text": "who has the pinnies"}
+      ],
+      "lines": [
+        {"who": "Marcus", "text": "team dinner after the game? @squad decide wings, tacos, pho"},
+        {"who": "Noah", "text": "i have a shift till 9, might be late"},
+        {"who": "Jake", "text": "@squad ride to the rec fields thursday"},
+        {"who": "Diego", "text": "driving 3"},
+        {"who": "Marcus", "text": "ride from tooker"},
+        {"who": "Diego", "text": "vamos equipo, we got this"}
+      ]
+    },
+    {
+      "name": "isa-events",
+      "topic": "Indian Students Association events team",
+      "about": "the Indian Students Association events team planning Diwali night, potlucks, ticket sales and volunteers",
+      "members": ["Arjun", "Kavya", "Rohan", "Priya"],
+      "seed": [
+        {"who": "Kavya", "text": "diwali night tickets are $15, venmo me by friday 🪔"},
+        {"who": "Rohan", "text": "kal ka potluck kaun kaun aa raha hai?"}
+      ],
+      "lines": [
+        {"who": "Arjun", "text": "need 4 volunteers for setup at 5pm saturday"},
+        {"who": "Kavya", "text": "seri seri, i'll handle the decorations"},
+        {"who": "Priya", "text": "@squad add diyas, plates, rangoli colors"},
+        {"who": "Rohan", "text": "@squad translate kal ka potluck kaun kaun aa raha hai to english"},
+        {"who": "Kavya", "text": "deadline to submit the dance lineup is thursday night!!"},
+        {"who": "Arjun", "text": "@squad mentions"}
+      ]
+    },
+    {
+      "name": "hackathon-team",
+      "topic": "Hackathon team",
+      "about": "a 4-person hackathon team: splitting work, deadlines, late night debugging, the pitch",
+      "members": ["Wei", "Ava", "Arjun", "Lena"],
+      "seed": [
+        {"who": "Wei", "text": "@squad project hackathon demo due 11/8"},
+        {"who": "Wei", "text": "@squad tasks frontend 4h, backend 5h, pitch deck 2h, demo video 2h"},
+        {"who": "Lena", "text": "dibs pitch deck"}
+      ],
+      "lines": [
+        {"who": "Arjun", "text": "dibs backend"},
+        {"who": "Ava", "text": "@squad split"},
+        {"who": "Wei", "text": "ok"},
+        {"who": "Lena", "text": "ok"},
+        {"who": "Arjun", "text": "the api is up, lgtm on my end"},
+        {"who": "Ava", "text": "@squad status"}
+      ]
+    },
+    {
+      "name": "road-trip-flagstaff",
+      "topic": "Flagstaff snow trip",
+      "about": "friends planning a day trip to Flagstaff for snow: carpools, gas money, snacks, leaving time",
+      "members": ["Sam", "Maya", "Jake", "Kavya"],
+      "seed": [
+        {"who": "Maya", "text": "flagstaff snow trip saturday?? leaving 8am ❄️"},
+        {"who": "Sam", "text": "@squad ride to flagstaff saturday"}
+      ],
+      "lines": [
+        {"who": "Jake", "text": "driving 4"},
+        {"who": "Kavya", "text": "ride from adelphi"},
+        {"who": "Maya", "text": "ride from manzanita"},
+        {"who": "Sam", "text": "@squad match rides"},
+        {"who": "Jake", "text": "gas was $48, splitting it after"},
+        {"who": "Kavya", "text": "@squad weather"}
+      ]
+    },
+    {
+      "name": "apartment-12c",
+      "topic": "Apartment 12C roommates",
+      "about": "three roommates sharing an apartment: bills, chores, groceries, the landlord, quiet hours",
+      "members": ["Noah", "Lena", "Rohan"],
+      "seed": [
+        {"who": "Noah", "text": "@squad chores dishes, trash, bathroom"},
+        {"who": "Rohan", "text": "internet bill is $60 this month, i paid it"}
+      ],
+      "lines": [
+        {"who": "Lena", "text": "@squad add eggs, rice, coffee"},
+        {"who": "Rohan", "text": "@squad bill\nRohan: internet 20\nNoah: internet 20\nLena: internet 20"},
+        {"who": "Noah", "text": "done dishes"},
+        {"who": "Lena", "text": "got coffee"},
+        {"who": "Rohan", "text": "landlord said the AC guy comes tuesday between 10 and 2"},
+        {"who": "Noah", "text": "@squad owes"}
+      ]
+    },
+    {
+      "name": "spanish-club",
+      "topic": "Club de español",
+      "about": "a spanish conversation club: taco nights, practice meetups, mostly spanish with some english",
+      "members": ["Maya", "Diego", "Ava"],
+      "seed": [
+        {"who": "Diego", "text": "@squad translate on"},
+        {"who": "Maya", "text": "¿quién viene a la noche de tacos el viernes? 🌮"}
+      ],
+      "lines": [
+        {"who": "Diego", "text": "yo voy! llevo la salsa"},
+        {"who": "Ava", "text": "can someone tell me what time? my spanish is still rough lol"},
+        {"who": "Maya", "text": "a las 7 en el MU, traigan sus propias bebidas"},
+        {"who": "Diego", "text": "@squad translate see you friday, bring chips to spanish"},
+        {"who": "Maya", "text": "la reunión de práctica es el martes a las 6"},
+        {"who": "Ava", "text": "@squad tldr"}
+      ]
+    }
+  ]
+}

@@ -47,9 +47,13 @@ def looks_non_english(text):
 
 class LifeMixin:
     # ----- memory of recent group messages (for tldr / translate last) -----
-    def remember(self, st, who, text):
+    def remember(self, st, who, text, guid=None):
         h = st.setdefault("history", [])
-        h.append({"who": who, "text": text[:500], "at": self.clock().isoformat()})
+        st["hseq"] = st.get("hseq", 0) + 1
+        x = {"id": st["hseq"], "who": who, "text": text[:500], "at": self.clock().isoformat()}
+        if guid:
+            x["guid"] = guid
+        h.append(x)
         if len(h) > 300:
             del h[: len(h) - 300]
 
@@ -96,7 +100,7 @@ class LifeMixin:
             settings["translate"] = False
             return [self.say(cid, "🌐 auto-translate off")]
         if not (self.llm and self.llm.enabled):
-            return [self.say(cid, "translation needs the Grok key set up on the bot's Mac 🙏")]
+            return [self.say(cid, "translation needs a language model key on the bot (LLM_API_KEY or XAI_API_KEY in .env) 🙏")]
         m = re.search(r"\s+(?:to|into|in)\s+([a-z]+)\s*$", t, re.I)
         target = m.group(1).lower() if m and m.group(1).lower() in LANGS else None
         if m and target:

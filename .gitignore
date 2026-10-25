@@ -3,3 +3,7 @@ state/
 out/
 __pycache__/
 *.pyc
+data-web/
+.venv/
+venv/
+data-discord/

@@ -170,7 +170,7 @@ send(b3, "Jake", "what time tomorrow?")
 out = send(b3, "Amrish", "@squad tldr")
 check("tldr works without Grok (mentions + questions)", "you got mentioned" in T(out) and "questions" in T(out), T(out))
 out = send(b3, "Amrish", "@squad translate hola")
-check("translate without key explains", "needs the Grok key" in T(out), T(out))
+check("translate without key explains", "needs a language model key" in T(out), T(out))
 
 # ---------- bills ----------
 b4, c4 = new_bot(now)

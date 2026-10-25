@@ -6,6 +6,7 @@ from datetime import datetime
 from .life import LifeMixin
 from .market import MarketMixin
 from .money import MoneyMixin
+from .radar import RadarMixin
 from .rides import RidesMixin
 
 MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
@@ -27,16 +28,20 @@ HELP_TOPICS = {
     "home": "🏠 roommates: @squad chores dishes, trash · \"done dishes\" · @squad add oat milk · \"got oat milk\"",
     "fun": "🎲 fun: @squad this or that (on/off) · @squad flake meter on → \"track me\" · secret birthday planning by DM",
     "lang": "🌐 @squad translate <text> to spanish · @squad translate (last message) · @squad translate on (auto)",
-    "catchup": "📝 @squad tldr · @squad tldr 6h",
+    "radar": "✨ @squad highlights (today / week / money / plans) · @squad mentions (who tagged you) · @squad decisions\n"
+             "‼️ a message (or reply 📌) to pin it · @squad pins · \"remind #2\" · @squad bumps off · @squad welcome back on",
+    "voice": "🔊 @squad voice tldr · @squad voice highlights · @squad voice me · @squad read that · @squad voice tldr in tamil · @squad voice on",
+    "stats": "📊 @squad stats (week / today / all) · @squad wrapped (on = every Sunday 8pm) · DM \"squad hide my stats\" to opt out",
+    "catchup": "📝 @squad tldr · @squad tldr 6h · @squad tldr voice",
     "privacy": "🔒 DM me \"squad setup\" to add your schedule privately. friends only ever see free/busy. @squad why shows what was shared",
 }
 HELP = ("hey 👋 i'm Squad Radar. what i do:\n" + "\n".join("- " + v.split("\n")[0] for v in HELP_TOPICS.values())
-        + "\n\"@squad help market\" (or money, rides, project, home, fun, lang) for details")
+        + "\n\"@squad help radar\" (or voice, stats, market, money, rides, project, home, fun, lang) for details")
 
 
-class FeaturesMixin(MarketMixin, MoneyMixin, RidesMixin, LifeMixin):
+class FeaturesMixin(RadarMixin, MarketMixin, MoneyMixin, RidesMixin, LifeMixin):
     def contextual(self, msg, st, who, text, low):
-        for h in (self.ctx_market, self.ctx_listit, self.ctx_bill, self.ctx_food, self.ctx_rides, self.ctx_tix, self.ctx_tot,
+        for h in (self.ctx_radar, self.ctx_market, self.ctx_listit, self.ctx_bill, self.ctx_food, self.ctx_rides, self.ctx_tix, self.ctx_tot,
                   self.ctx_flake, self.ctx_paid, self.ctx_got, self.ctx_chore_done):
             r = h(msg, st, who, low)
             if r is not None:
@@ -59,7 +64,16 @@ class FeaturesMixin(MarketMixin, MoneyMixin, RidesMixin, LifeMixin):
             (r"^(rides?|carpool)\b", lambda: self.cmd_ride(msg, st, who, body)),
             (r"^(airport|flights?)\b", lambda: self.cmd_airport(msg, st, who, body)),
             (r"^game ?day|^(next )?game\b", lambda: self.cmd_gameday(msg, st, who, body)),
+            (r"^(tldr|tl;dr|catch me up|what did i miss|summary)\b.*\b(voice|audio|listen)\b", lambda: self.cmd_voice(msg, st, who, "voice tldr")),
             (r"^(tldr|tl;dr|catch me up|what did i miss|summary)", lambda: self.cmd_tldr(msg, st, who, body)),
+            (r"^(highlights?|important|what matters|what'?s important|decisions?|what did we decide)\b", lambda: self.cmd_highlights(msg, st, who, "decisions " + body if re.match(r"(?i)^(decisions?|what did we decide)", body) else body)),
+            (r"^(mentions?|tags?|tagged|my tags|who tagged me|@me)\b", lambda: self.cmd_mentions(msg, st, who, body)),
+            (r"^pins?\b|^pinned\b", lambda: self.cmd_pins(msg, st, who, body)),
+            (r"^(voice|listen|read it|read that|read out|say it|speak)\b", lambda: self.cmd_voice(msg, st, who, body)),
+            (r"^(stats|participation|who talks|leaderboard|activity)\b", lambda: self.cmd_stats(msg, st, who, body)),
+            (r"^wrapped\b", lambda: self.cmd_wrapped(msg, st, who, re.sub(r"(?i)^wrapped\s*", "", body))),
+            (r"^bumps?\s+(on|off)\b", lambda: self._toggle(msg, st, "bumps", low, "👀 question bumps")),
+            (r"^welcome back\s+(on|off)\b", lambda: self._toggle(msg, st, "welcome", low, "👋 welcome-back catch-up DMs")),
             (r"^translate", lambda: self.cmd_translate(msg, st, who, body)),
             (r"^study", lambda: self.cmd_study(msg, st, who, body)),
             (r"^(weather|heat|forecast)", lambda: self.cmd_weather(msg, st, who, body)),
@@ -73,6 +87,11 @@ class FeaturesMixin(MarketMixin, MoneyMixin, RidesMixin, LifeMixin):
             if re.match(pat, low):
                 return fn()
         return None
+
+    def _toggle(self, msg, st, key, low, label):
+        on = low.rstrip().endswith("on")
+        st.setdefault("settings", {})[key] = on
+        return [self.say(msg["chat_id"], "%s %s" % (label, "on" if on else "off"))]
 
     def passive(self, msg, st, who, text):
         r = self.passive_market(msg, st, who, text)
@@ -107,6 +126,14 @@ class FeaturesMixin(MarketMixin, MoneyMixin, RidesMixin, LifeMixin):
         if m:
             p.setdefault("prefs", {})["dorm"] = m.group(1).strip()
             return "dorm"
+        m = re.match(r"^(?:nickname|nicknames|call me|aka)\s+(.+)", low)
+        if m:
+            p.setdefault("prefs", {})["nicknames"] = [n.strip() for n in re.split(r",|\bor\b", m.group(1)) if n.strip()][:5]
+            return "nicknames (so I catch when people tag you)"
+        m = re.match(r"^(hide|show)\s+my\s+stats", low)
+        if m:
+            p.setdefault("prefs", {})["hide_stats"] = m.group(1) == "hide"
+            return "stats %s" % ("hidden" if m.group(1) == "hide" else "visible")
         m = re.match(r"^study buddy\s+(on|off|yes|no)", low)
         if m:
             p["study_buddy"] = m.group(1) in ("on", "yes")
@@ -124,6 +151,7 @@ class FeaturesMixin(MarketMixin, MoneyMixin, RidesMixin, LifeMixin):
             out += self.tick_flake(cid, st, now)
             out += self.tick_tot(cid, st, now)
             out += self.tick_chores(cid, st, now)
+            out += self.tick_radar(cid, st, now)
             if 18 <= now.hour < 19 and st.get("members") and st.get("study_day") != now.date().isoformat():
                 st["study_day"] = now.date().isoformat()
                 out += self.cmd_study({"chat_id": cid, "members": st["members"]}, st, None, "", auto=True)

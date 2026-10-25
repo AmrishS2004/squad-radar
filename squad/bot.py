@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from .agents import PersonalAgent
 from .features import HELP, FeaturesMixin
 from .ics import make_ics
-from .llm import INTENT_SYSTEM, TASKS_SYSTEM
+from .llm import CHAT_SYSTEM, INTENT_SYSTEM, TASKS_SYSTEM
 from .planner import FALLBACK_IDEAS, HangoutPlanner
 from .project import GENERIC_TASKS, allocate, parse_tasks
 from .timeparse import duration_minutes, fmt_slot, window
@@ -82,6 +82,8 @@ class SquadBot(FeaturesMixin):
     # ---------- entry points ----------
     def on_message(self, msg):
         """msg: chat_id, text, sender ('me' or a handle), members (handles), is_group."""
+        if msg.get("kind") == "reaction":
+            return self.on_reaction(msg) if msg.get("is_group") else []
         text = (msg.get("text") or "").strip()
         if not text:
             return []
@@ -103,9 +105,10 @@ class SquadBot(FeaturesMixin):
             return out
 
         st["members"] = msg.get("members", [])
+        extra = [] if m else self.welcome_back(msg, st, who)
         if not m:
-            self.remember(st, who, text)
-        extra = [] if m else self.auto_translate(msg, st, who, text)
+            self.remember(st, who, text, msg.get("guid"))
+        extra += [] if m else self.auto_translate(msg, st, who, text)
         ctx = None if m else self.contextual(msg, st, who, text, low)
         if ctx is not None:
             self.save()
@@ -138,8 +141,12 @@ class SquadBot(FeaturesMixin):
     def command(self, msg, st, who, body):
         low = body.lower()
         cid = msg["chat_id"]
-        if low in ("", "help", "hi", "hello", "what can you do", "?"):
+        if low in ("", "help", "what can you do", "?", "commands"):
             return [self.say(cid, HELP)]
+        if re.fullmatch(r"(hi+|hey+|hello+|yo+|sup|what'?s up|gm|good (morning|afternoon|evening)|hola|namaste|vanakkam)[\s!.👋]*", low):
+            return [self.say(cid, "hey %s 👋 what do you need? ask me anything about the chat, or \"@squad help\" for everything i can do" % (who or "there").split()[0])]
+        if re.fullmatch(r"(thanks|thank you|thx|ty|tysm|appreciate it)[\s!.🙏]*", low):
+            return [self.say(cid, "anytime 🫡")]
         r = self.feature_command(msg, st, who, body)
         if r is not None:
             return r
@@ -175,7 +182,13 @@ class SquadBot(FeaturesMixin):
                 return self.decide(msg, st, ", ".join(intent.get("options") or []))
             if it in ("split", "status", "receipts", "suggest", "why", "help"):
                 return self.command(msg, st, who, it)
-            reply = self.llm.chat(body)
+            mapped = {"market": "market", "owes": "owes", "tldr": "tldr", "highlights": "highlights", "mentions": "mentions",
+                      "stats": "stats", "pins": "pins", "groceries": "list"}.get(it)
+            if mapped:
+                r = self.feature_command(msg, st, who, mapped)
+                if r is not None:
+                    return r
+            reply = self.llm.chat("%s\n\n%s asks: %s" % (self.context_for(st, who), who, body), system=CHAT_SYSTEM, max_tokens=220)
             if reply:
                 return [self.say(cid, reply)]
         return [self.say(cid, "not sure what you mean 😅 try \"@squad help\"")]
@@ -247,6 +260,7 @@ class SquadBot(FeaturesMixin):
         need = len(poll["members"]) // 2 + 1
         if len(set(poll["ins"])) >= need:
             poll["status"] = "locked"
+            self.log_event(st, "plan")
             o = poll["options"][poll["winner"]]
             so, eo = datetime.fromisoformat(o["start"]), datetime.fromisoformat(o["end"])
             act = o["activity"]

@@ -250,6 +250,7 @@ class MarketMixin:
             return [self.say(cid, "deal 🤝 #%s for $%g. " % (iid, offer["amount"]) + self._give_hold(rec, offer["by"], now))]
         if verb == "sold":
             rec["status"] = "sold"
+            self.log_event(st, "sold", rec.get("cents", 0))
             rec["sold_to"] = re.sub(r"^to\s+", "", rest.strip()).title() or (rec["hold"]["by"] if rec["hold"] else "")
             rec["sold_at"] = now.isoformat()
             rec["hold"] = None

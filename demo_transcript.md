@@ -15,9 +15,12 @@ Runs offline: the two AI-written replies (🌐 translations and the 📝 tldr) a
 > - 🏠 roommates: @squad chores dishes, trash · "done dishes" · @squad add oat milk · "got oat milk"  
 > - 🎲 fun: @squad this or that (on/off) · @squad flake meter on → "track me" · secret birthday planning by DM  
 > - 🌐 @squad translate <text> to spanish · @squad translate (last message) · @squad translate on (auto)  
-> - 📝 @squad tldr · @squad tldr 6h  
+> - ✨ @squad highlights (today / week / money / plans) · @squad mentions (who tagged you) · @squad decisions  
+> - 🔊 @squad voice tldr · @squad voice highlights · @squad voice me · @squad read that · @squad voice tldr in tamil · @squad voice on  
+> - 📊 @squad stats (week / today / all) · @squad wrapped (on = every Sunday 8pm) · DM "squad hide my stats" to opt out  
+> - 📝 @squad tldr · @squad tldr 6h · @squad tldr voice  
 > - 🔒 DM me "squad setup" to add your schedule privately. friends only ever see free/busy. @squad why shows what was shared  
-> "@squad help market" (or money, rides, project, home, fun, lang) for details
+> "@squad help radar" (or voice, stats, market, money, rides, project, home, fun, lang) for details
 
 **Priya** (Thu Oct 29 06:02 PM): anyone free this weekend??
 > 🤖 ok i checked everyone's classes for this weekend 👀  
@@ -302,3 +305,71 @@ shared: fries 8
 **Sam** (Fri Dec 11 12:35 PM): @squad this or that
 > 🤖 🎲 this or that: A) 110°F summer  or  B) freezing winter ?  
 > reply A or B
+
+## Group radar: what matters, who tagged you, voice notes, stats
+
+**Priya** (Fri Dec 11 01:00 PM): heads up the landlord moved the move-out inspection to mon 10am, clean your rooms
+
+**Jake** (Fri Dec 11 01:01 PM): noooo
+
+**Sam** (Fri Dec 11 01:01 PM): 💀💀
+
+*Sam tapped ‼️ on Priya's message*
+
+*Jake tapped ❤️ on Priya's message*
+
+**Priya** (Fri Dec 11 01:05 PM): @jake can you return the router before you fly out?
+
+**Jake** (Fri Dec 11 01:10 PM): lol
+
+**Amrish** (Fri Dec 11 01:12 PM): final electric bill is $84, i'll split it tonight
+
+**Sam** (Fri Dec 11 01:20 PM): does anyone have a vacuum i can borrow?
+
+*Fri Dec 11 04:30 PM*
+> 🤖 👀 bumping Sam's question from 1:20pm, nobody answered: "does anyone have a vacuum i can borrow?"
+
+**Jake** (Fri Dec 11 05:00 PM): @squad highlights
+> 🤖 ✨ highlights (last 24h · 9 msgs → 4 that matter):  
+> 1. 📌⏰ Priya · 1pm: "heads up the landlord moved the move-out inspection to mon 10am, clean your rooms" ‼️ ❤️  
+> 2. ⏰💸 Amrish · 1:12pm: "final electric bill is $84, i'll split it tonight"  
+> 3. 🙋❓ Priya · 1:05pm: "@jake can you return the router before you fly out?"  
+> 4. ❓ Sam · 1:20pm: "does anyone have a vacuum i can borrow?"  
+> reply "remind #1" · "pin #2" · "@squad voice highlights" to listen
+
+**Jake** (Fri Dec 11 05:01 PM): remind #1 tomorrow
+> 🤖 🔔 got it, I'll remind you tomorrow at 9am
+
+**Jake** (Fri Dec 11 05:02 PM): @squad mentions
+> 🤖 🙋 Jake, you got tagged 1 time (last 3 days):  
+> - ❓ asked you · Priya 1:05pm: "@jake can you return the router before you fly out?"
+
+**Jake** (Fri Dec 11 05:03 PM): @squad voice highlights
+> 🤖 🔊 highlights for Jake (~26s)
+> 🤖 🔊 *voice note (audio file). It says:* "highlights. Priya, 1 P M, said: heads up the landlord moved the move-out inspection to mon 10 A M, clean your rooms. Amrish, 1 12 P M, said: final electric bill is $84, i'll split it tonight. Priya, 1 05 P M, said: jake can you return the router before you fly out? Sam, 1 20 P M, said: does anyone have a vacuum i can borrow?"
+
+**Priya** (Fri Dec 11 05:05 PM): @squad stats
+> 🤖 📊 who's talking (this week, 17 msgs):  
+> Jake   ▓▓▓▓░░░░░░ 41% · 7  
+> Priya  ▓▓▓░░░░░░░ 29% · 5  
+> Sam    ▓▓░░░░░░░░ 18% · 3  
+> Amrish ▓░░░░░░░░░ 12% · 2  
+> 🗣️ starts the most convos: Jake (4)  
+> ❤️ most reactions: Priya (2)  
+> ❓ asks the most questions: Priya (1)  
+> ⚡ fastest replier: Sam (~1 min)  
+> 📚 CSE 310 pitch:  
+> - Amrish ░░░░░░ 0/1 parts done  
+> - Jake ░░░░░░ 0/1 parts done  
+> - Priya ▓▓▓▓▓▓ 1/1 parts done  
+> - Sam ▓▓▓░░░ 1/2 parts done  
+> (counts only this chat. DM me "squad hide my stats" to opt out)
+
+**Sam** (Fri Dec 11 05:06 PM): @squad wrapped
+> 🤖 🎁 Squad Wrapped · Dec 4 – Dec 11  
+> 💬 17 messages · busiest hour: Fri 1pm  
+> 🏆 top yapper: Jake (7) · 🤫 lowkey: Amrish (2)  
+> 🔥 message of the week (‼️ ❤️): Priya: "heads up the landlord moved the move-out inspection to mon 10am, clean your rooms"  
+> 😂 emoji of the week: 💀 (2)  
+> 🛒 items sold: 1  
+> 📌 pinned this week: 1
