@@ -1,0 +1,13 @@
+{
+  "name": "Amrish",
+  "handles": ["me"],
+  "share_reasons": true,
+  "classes": [
+    {"days": "MW", "start": "10:30", "end": "11:45", "label": "CSE 310"},
+    {"days": "TTh", "start": "13:30", "end": "14:45", "label": "CSE 360"}
+  ],
+  "busy": [{"date": "2026-10-30", "start": "18:00", "end": "19:00", "label": "robotics club"}],
+  "exams": [],
+  "prefs": {"earliest": "10:00", "latest": "23:30", "budget": 20, "diet": []},
+  "project": {"hours_this_week": 8, "skills": ["coding", "slides"], "avoid": []}
+}
