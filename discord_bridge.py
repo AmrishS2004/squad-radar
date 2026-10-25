@@ -140,6 +140,8 @@ class DiscordBridge:
         self.loop = None
         self.queue = None
         self.sim_running = False
+        self.restored = False
+        app.discord_status = {"connected": False}
         self.live = False
         self.live_task = None
         self.live_count = 0
@@ -154,6 +156,10 @@ class DiscordBridge:
         @c.event
         async def on_ready():
             print("Discord: signed in as %s, in %d server(s)" % (c.user, len(c.guilds)))
+            self.app.discord_status = {"connected": True, "bot": str(c.user), "servers": len(c.guilds), "live": self.live}
+            if not self.restored:
+                self.restored = True
+                asyncio.ensure_future(self.restore())
 
         @c.event
         async def on_message(m):
@@ -469,6 +475,66 @@ class DiscordBridge:
         finally:
             self.sim_running = False
 
+    async def restore(self):
+        """After a restart (or on a fresh server), find the demo channels, reload their recent messages onto the
+        website and into the bot's memory, and turn live chat back on."""
+        try:
+            loop = asyncio.get_running_loop()
+            me = self.client.user.id if self.client.user else None
+            for g in self.client.guilds:
+                specs = self.live_specs(g)
+                if not specs:
+                    continue
+                names = set()
+                for _, spec in specs:
+                    names |= set(spec["members"])
+                sim_personas = json.load(open(SIM_FILE, encoding="utf-8")).get("personas", [])
+                personas = await loop.run_in_executor(None, self.ensure_personas,
+                                                      [p for p in sim_personas + self.group_personas(self.load_groups()) if p["name"] in names])
+                total = 0
+                for ch, spec in specs:
+                    cid, title = chat_of(ch.id), self.title(ch)
+                    items, seen = [], []
+                    try:
+                        async for msg in ch.history(limit=int(os.environ.get("SQUAD_RESTORE_MESSAGES") or 60)):
+                            items.append(msg)
+                    except Exception as e:  # noqa: BLE001
+                        print("Discord: couldn't read #%s history (%s). Give the bot Read Message History." % (ch.name, e))
+                        continue
+                    items.reverse()
+                    rows = []
+                    for msg in items:
+                        if not msg.content:
+                            continue
+                        if me and msg.author.id == me:
+                            text = re.sub(r"\n-# written by .*$", "", msg.content)
+                            rows.append({"kind": "bot", "handle": "bot", "who": "Squad Radar", "text": text, "guid": "dc-%d" % msg.id})
+                            continue
+                        if msg.webhook_id:
+                            who = msg.author.name
+                            handle = personas.get(who) or "sim:" + who.lower()
+                        else:
+                            handle = handle_of(msg.author.id)
+                            who = await loop.run_in_executor(None, self.app.ensure_profile, handle, msg.author.display_name)
+                        if handle not in seen:
+                            seen.append(handle)
+                        text = normalize(msg.content, me, self.names())
+                        at = msg.created_at.astimezone(self.app.tz).isoformat(timespec="seconds") if getattr(msg, "created_at", None) else None
+                        rows.append({"kind": "user", "handle": handle, "who": self.app.bot.name_of(handle) or who, "text": text,
+                                     "guid": "dc-%d" % msg.id, "at": at})
+                    members = list(dict.fromkeys([personas[n] for n in spec["members"] if n in personas] + seen))
+                    with self.app.db_lock:
+                        self.members[cid] = list(dict.fromkeys(self.members.get(cid, []) + members))
+                        members = list(self.members[cid])
+                    total += await loop.run_in_executor(None, self.app.import_history, cid, title, members, rows)
+                print("Discord: restored %d demo channels in %s (%d messages loaded)" % (len(specs), g.name, total))
+                if os.environ.get("SQUAD_LIVE_AUTOSTART", "1") != "0":
+                    await self.start_live(g, specs, None)
+                    print("Discord: live demo chat is on (every ~%ds). '@squad live off' pauses it." % int(self.live_every))
+            self.app.discord_status["live"] = self.live
+        except Exception:  # noqa: BLE001
+            print("Discord: restoring the demo failed:\n" + traceback.format_exc())
+
     # ---------- live mode: groups that keep chatting on their own ----------
     def load_groups(self):
         try:
@@ -480,8 +546,8 @@ class DiscordBridge:
         """Turn the short persona specs in discord_groups.json into full profiles (classes, dorm, language)."""
         out = []
         for name, p in groups.get("personas", {}).items():
-            prof = {"classes": [{"days": c[0], "start": c[1], "end": c[2], "label": c[3]} for c in p.get("classes", [])],
-                    "busy": [{"days": b[0], "start": b[1], "end": b[2], "label": b[3]} for b in p.get("busy", [])],
+            prof = {"classes": [{"days": c[0], "start": c[1], "end": c[2], "label": c[3]} for c in p.get("classes", []) + p.get("weekly", [])],
+                    "busy": [],
                     "exams": [], "share_reasons": False,
                     "prefs": {k: v for k, v in (("dorm", p.get("dorm")), ("language", p.get("language"))) if v},
                     "project": {"hours_this_week": 5, "skills": [], "avoid": []}, "vibe": p.get("vibe", "")}
@@ -543,6 +609,7 @@ class DiscordBridge:
             await loop.run_in_executor(None, lambda: self.app.mirror_room(cid, self.title(ch), members, demo=True))
             slots.append({"channel": ch, "hook": hook, "cid": cid, "title": self.title(ch), "spec": spec, "personas": personas})
         self.live = True
+        self.app.discord_status["live"] = True
         if self.live_task and not self.live_task.done():
             return
         self.live_task = asyncio.ensure_future(self.live_loop(slots, control))
@@ -621,6 +688,7 @@ class DiscordBridge:
                                    "`@squad live on` to keep going." % self.live_count)
         finally:
             self.live = False
+            self.app.discord_status["live"] = False
 
     # ---------- outgoing ----------
     def send(self, o, ai=None):

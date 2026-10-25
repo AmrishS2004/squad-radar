@@ -7,7 +7,7 @@
     "Diego":  {"vibe": "soccer captain, bilingual, texts in spanish sometimes", "classes": [["TTh", "12:00", "13:15", "SPA 313"]], "dorm": "manzanita", "language": "spanish"},
     "Arjun":  {"vibe": "CS grad student, helpful, mixes hindi and english (hinglish)", "classes": [["MW", "16:30", "17:45", "CSE 310"]], "dorm": "vista del sol", "language": "hindi"},
     "Wei":    {"vibe": "hackathon nerd, ships at 3am, says 'lgtm'", "classes": [["TTh", "15:00", "16:15", "CSE 340"]], "dorm": "hassayampa"},
-    "Noah":   {"vibe": "busy grad student, works shifts, dry humor", "classes": [["MW", "18:00", "19:15", "EEE 598"]], "dorm": "district", "busy": [["Sat", "12:00", "17:00", "work shift"]]},
+    "Noah":   {"vibe": "busy grad student, works shifts, dry humor", "classes": [["MW", "18:00", "19:15", "EEE 598"]], "dorm": "district", "weekly": [["S", "12:00", "17:00", "work shift"]]},
     "Kavya":  {"vibe": "runs Indian Students Association events, energetic, uses some tamil words (tanglish)", "classes": [["MWF", "11:00", "11:50", "BIO 181"]], "dorm": "adelphi", "language": "tamil"},
     "Rohan":  {"vibe": "foodie, always organizing potlucks, hinglish", "classes": [["TTh", "09:00", "10:15", "ECN 211"]], "dorm": "district", "language": "hindi"}
   },

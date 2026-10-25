@@ -87,6 +87,18 @@ class Channel:
     async def webhooks(self):
         return self.hooks
 
+    async def history(self, limit=100, oldest_first=None):
+        """Newest first, like Discord. Persona posts come from the webhook; the rest are the bot's own messages."""
+        for x in reversed(self.sent[-limit:]):
+            if not x.get("text"):
+                continue
+            if x.get("as"):
+                author = type("A", (), {"id": 777, "name": x["as"], "display_name": x["as"], "bot": True})()
+                yield type("M", (), {"id": x["msg"].id, "author": author, "content": x["text"], "webhook_id": 1, "created_at": None})()
+            else:
+                author = type("A", (), {"id": 4242, "name": "Square Radar", "display_name": "Square Radar", "bot": True})()
+                yield type("M", (), {"id": id(x), "author": author, "content": x["text"], "webhook_id": None, "created_at": None})()
+
     async def create_webhook(self, name):
         h = Hook(name, self)
         self.hooks.append(h)
@@ -443,6 +455,29 @@ clock["now"] += timedelta(hours=1, minutes=1)
 before = len(apt.sent)
 app.tick(); time.sleep(0.3)
 check("the website's reminder posts in the Discord channel on time", any("take out the trash" in (x["text"] or "") for x in apt.sent[before:]), apt.sent[before:])
+# ---------- a restarted (or brand new) server rebuilds the demo from Discord ----------
+type(bridge.client).guilds = property(lambda self: [guild])
+os.environ["SQUAD_LIVE_AUTOSTART"] = "0"
+app2 = web.App(tempfile.mkdtemp(), llm=FakeModel(), clock=lambda: clock["now"], samples=False)
+bridge2 = DiscordBridge(app2, "fake-token", "", website=True)
+check("a fresh server starts with no demo channels", not [r for r in app2.db["rooms"].values() if r.get("demo")])
+asyncio.run_coroutine_threadsafe(bridge2.restore(), loop).result(30)
+restored = [r for r in app2.db["rooms"].values() if r.get("demo")]
+check("on startup it finds all 13 demo channels and puts them back on the website", len(restored) == 13, len(restored))
+apt2 = app2.db["rooms"]["dc%d" % apt.id]
+check("with their recent messages, friends and bot replies in order",
+      any(m["who"] == "Priya" and "landlord" in m["text"] for m in apt2["messages"]) and any(m["kind"] == "bot" for m in apt2["messages"])
+      and not any("written by" in (m["text"] or "") for m in apt2["messages"]), [m["who"] for m in apt2["messages"]][:8])
+check("the bot remembers them too, so tldr and highlights work right away",
+      any("landlord" in h["text"] for h in app2.bot.state["dc%d" % apt.id]["history"]))
+check("restoring twice doesn't duplicate anything", asyncio.run_coroutine_threadsafe(bridge2.restore(), loop).result(30) is None
+      and len(app2.db["rooms"]["dc%d" % apt.id]["messages"]) == len(apt2["messages"]))
+res = app2.assist(app2.join("Visitor")[1], "dc%d" % apt.id, "highlights")
+check("the restored board works on the website", "landlord" in res["text"], res["text"][:200])
+h2 = app2.llm_status()
+check("health explains a missing model key", web.App(tempfile.mkdtemp(), llm=type("M", (), {"enabled": False, "status": lambda self: {"enabled": False}})()).llm_status().get("fix", "").startswith("No model key"))
+os.environ.pop("SQUAD_LIVE_AUTOSTART")
+
 asyncio.sleep = _fast
 out = say(amrish, general, "@squad simulate reset")
 asyncio.sleep = _orig_sleep

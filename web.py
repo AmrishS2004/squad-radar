@@ -171,6 +171,11 @@ class App:
     def llm_status(self):
         st = self.model.status() if hasattr(self.model, "status") else {"enabled": bool(getattr(self.model, "enabled", False))}
         st["live"] = bool(st.get("ok"))
+        if not st.get("enabled"):
+            st["fix"] = ("No model key on this server. Set LLM_API_KEY (and LLM_BASE_URL, LLM_MODEL) in the host's "
+                         "environment variables, not in .env, then redeploy.")
+        elif st.get("last_error"):
+            st["fix"] = "The key is set but the model call failed. Check the key is correct and has no spaces or quotes."
         return st
 
     # ---------- people ----------
@@ -257,6 +262,29 @@ class App:
             self.refresh_boards(link.get("room")) if link.get("room") in self.db["rooms"] else None
             self.save()
         return token, u, link.get("room")
+
+    def import_history(self, cid, title, members, items):
+        """Put recent Discord messages back on the website and in the bot's memory after a restart (no replies are sent).
+        items: dicts with kind ('user' or 'bot'), handle, who, text, guid, at (ISO)."""
+        with self.lock:
+            r = self.mirror_room(cid, title, members, demo=True)
+            st = self.bot.chat_state(cid)
+            st["members"] = list(r["members"])
+            have = {m.get("guid") for m in r["messages"]} | {x.get("guid") for x in st.get("history", [])}
+            added = 0
+            for it in items:
+                if not it.get("text") or it.get("guid") in have:
+                    continue
+                m = self.add_msg(r, it["kind"], it["who"], it["handle"], it["text"], guid=it.get("guid"))
+                m["at"] = it.get("at") or m["at"]
+                if it["kind"] == "user":
+                    self.bot.remember(st, it["who"], it["text"], it.get("guid"))
+                    st["history"][-1]["at"] = m["at"]
+                added += 1
+            self.refresh_boards(cid)
+            self.save()
+            self.bot.save()
+            return added
 
     def forget_room(self, cid):
         with self.lock:
@@ -795,7 +823,9 @@ def make_handler(app):
             q = parse_qs(u.query)
             try:
                 if u.path == "/api/health":
-                    return self._send(200, {"ok": True, "llm": app.llm_status(), "time": iso(app.now())})
+                    return self._send(200, {"ok": True, "llm": app.llm_status(), "discord": getattr(app, "discord_status", None),
+                                            "squads": len(app.db["rooms"]), "demo_channels": sum(1 for r in app.db["rooms"].values() if r.get("demo")),
+                                            "time": iso(app.now())})
                 if u.path == "/api/me":
                     with app.db_lock:
                         return self._send(200, json.loads(json.dumps(app.me(app.user(self._token())))))
