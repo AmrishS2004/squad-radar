@@ -6,6 +6,7 @@ import re
 from datetime import datetime, timedelta
 
 from .agents import PersonalAgent
+from .features import HELP, FeaturesMixin
 from .ics import make_ics
 from .llm import INTENT_SYSTEM, TASKS_SYSTEM
 from .planner import FALLBACK_IDEAS, HangoutPlanner
@@ -17,16 +18,6 @@ PASSIVE = re.compile(r"\b(anyone free|any(?:one|body) down|when (?:is|are) (?:ev
                      r"let'?s hang|wanna hang|we should hang)\b", re.I)
 MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
 
-HELP = ("here's what i do 👇\n"
-        "- \"anyone free this weekend?\" → i find a time that fits everyone's classes + something to do\n"
-        "- reply 1 / 2 to vote, then \"in\" to lock it (i send the invite)\n"
-        "- @squad decide tacos, sushi, pizza → i pick\n"
-        "- @squad project <name> due <date> → group project mode\n"
-        "- @squad tasks a 2h, b 3h... / @squad suggest → @squad split\n"
-        "- dibs <part> · done <part> · @squad status · @squad receipts\n"
-        "- @squad why → what each person's agent shared (never your actual schedule)\n"
-        "- DM me \"squad setup\" to add your schedule privately")
-
 CELEBRATE = ["let's gooo", "W", "absolute machine", "the group carry fr", "clean"]
 
 
@@ -35,7 +26,7 @@ def bar(done, total, width=10):
     return "▓" * n + "░" * (width - n)
 
 
-class SquadBot:
+class SquadBot(FeaturesMixin):
     def __init__(self, profiles, events, tz, clock, state_path=None, llm=None, owner="me", outdir="out", prefix=""):
         self.tz = tz
         self.clock = clock
@@ -106,9 +97,19 @@ class SquadBot:
 
         if not msg.get("is_group"):
             if m:
-                out = self.setup_dm(msg, body)
+                reply = self.bday_dm(who, low, body)
+                out = [self.say(cid, reply)] if reply else self.setup_dm(msg, body)
             self.save()
             return out
+
+        st["members"] = msg.get("members", [])
+        if not m:
+            self.remember(st, who, text)
+        extra = [] if m else self.auto_translate(msg, st, who, text)
+        ctx = None if m else self.contextual(msg, st, who, text, low)
+        if ctx is not None:
+            self.save()
+            return ctx + extra
 
         # contextual replies that don't need @squad
         if st.get("poll") and st["poll"]["status"] == "open" and re.fullmatch(r"(?:option\s*)?([12])|neither|none", low):
@@ -123,6 +124,8 @@ class SquadBot:
             out = self.accept(msg, st, who)
         elif m:
             out = self.command(msg, st, who, body)
+        elif not m and (pas := self.passive(msg, st, who, text)):
+            out = pas
         elif PASSIVE.search(text):
             last = self.last_passive.get(cid)
             now = self.clock()
@@ -130,13 +133,16 @@ class SquadBot:
                 self.last_passive[cid] = now
                 out = self.plan(msg, st, text)
         self.save()
-        return out
+        return out + extra
 
     def command(self, msg, st, who, body):
         low = body.lower()
         cid = msg["chat_id"]
         if low in ("", "help", "hi", "hello", "what can you do", "?"):
             return [self.say(cid, HELP)]
+        r = self.feature_command(msg, st, who, body)
+        if r is not None:
+            return r
         if re.match(r"^(plan|free|hang|when|find a time|schedule)\b", low) or PASSIVE.search(low) or "free" in low:
             return self.plan(msg, st, body)
         if low.startswith("decide") or "where should we eat" in low or "what should we eat" in low or low.startswith("pick"):
@@ -474,6 +480,10 @@ class SquadBot:
         for line in re.split(r"[\n;]+", body):
             l = line.strip()
             ll = l.lower()
+            extra_lab = self.setup_extra(p, l, ll)
+            if extra_lab:
+                changed.append(extra_lab)
+                continue
             mc = re.match(r"^(?:classes?\s+)?([mtwrfsu]{1,5}|[mtwfsu]+th?|tth|mwf|mw)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*-\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(.*)$", l, re.I)
             if ll.startswith("class") or mc:
                 if mc:
@@ -517,12 +527,14 @@ class SquadBot:
         now = self.clock()
         out = []
         for cid, st in self.state.items():
+            if cid.startswith("_"):
+                continue
             for r in st.get("reminders", []):
                 if not r["sent"] and datetime.fromisoformat(r["at"]) <= now:
                     r["sent"] = True
                     out.append(self.say(cid, r["text"]))
             pr = st.get("project")
-            if pr and pr.get("assign") and 9 <= now.hour < 22:  # no check-ins during quiet hours
+            if pr and pr.get("assign") and 9 <= now.hour < 22 and now <= datetime.fromisoformat(pr["due"]):  # quiet hours, and stop after the deadline
                 due_soon = {}
                 for t in pr["tasks"]:
                     name = t["name"]
@@ -541,6 +553,7 @@ class SquadBot:
                     when = min(d for _, d in items).strftime("%a")
                     out.append(self.say(cid, "friendly check-in 👋 %s, how's %s going? due %s.%s reply \"done <part>\" when it's in" % (
                         who, names, when, help_)))
+        out += self.feature_tick(now)
         if out:
             self.save()
         return out

@@ -134,8 +134,10 @@ def cmd_imessage():
 
 
 def deliver(im, o):
-    print(">>", o.get("text") or ("[file] " + o.get("file", "")))
-    if o.get("file"):
+    print(">>", ("[DM %s] " % o["dm"]) if o.get("dm") else "", o.get("text") or ("[file] " + o.get("file", "")))
+    if o.get("dm"):
+        im.send_dm(o["dm"], o["text"])
+    elif o.get("file"):
         im.send_file(o["chat_id"], o["file"])
     else:
         im.send_text(o["chat_id"], o["text"])
@@ -185,7 +187,9 @@ def cmd_sim():
 
 
 def print_out(o):
-    if o.get("file"):
+    if o.get("dm"):
+        print("   🤖 (private DM to %s) %s" % (o["dm"], o["text"]))
+    elif o.get("file"):
         print("   🤖 [calendar invite: %s]" % os.path.basename(o["file"]))
     else:
         for i, l in enumerate(o["text"].split("\n")):
@@ -193,6 +197,8 @@ def print_out(o):
 
 
 DEMO = [
+    ("## Plans", None, None),
+    ("2026-10-29T18:00", "Sam", "@squad help"),
     ("2026-10-29T18:02", "Priya", "anyone free this weekend??"),
     ("2026-10-29T18:03", "Jake", "1"),
     ("2026-10-29T18:03", "Sam", "1"),
@@ -202,7 +208,21 @@ DEMO = [
     ("2026-10-29T18:06", "Priya", "in"),
     ("2026-10-29T18:07", "Amrish", "@squad why"),
     ("2026-10-29T18:10", "Sam", "@squad decide tacos, sushi, pizza"),
+    ("## Money", None, None),
+    ("2026-10-30T19:40", "Amrish", "@squad bill tax 8% tip 18%\nJake: burger 14\nPriya: pasta 16, soda 3\nshared: fries 8"),
+    ("2026-10-30T19:45", "Jake", "paid"),
+    ("2026-10-30T21:00", "Priya", "anyone want boba"),
+    ("2026-10-30T21:01", "Priya", "@squad food run kung fu tea 10"),
+    ("2026-10-30T21:02", "Jake", "+ taro milk tea less ice $6.5"),
+    ("2026-10-30T21:03", "Sam", "+ mango slush $5.25"),
+    ("2026-10-30T21:12", None, "tick"),
+    ("## Translation and catching up", None, None),
+    ("2026-10-31T09:00", "Sam", "@squad translate on"),
+    ("2026-10-31T09:05", "Priya", "enna plan naalaiku? sapdu porom ah?"),
+    ("2026-10-31T09:06", "Jake", "@squad translate see you at 7 to spanish"),
+    ("2026-10-31T13:30", "Amrish", "@squad tldr"),
     ("2026-10-31T17:00", None, "tick"),
+    ("## Group project", None, None),
     ("2026-11-01T20:00", "Amrish", "@squad project CSE 310 pitch due nov 6"),
     ("2026-11-01T20:01", "Amrish", "@squad tasks research 3h, intro slides 2h, demo video 3h, final deck 3h, presenting prep 1h"),
     ("2026-11-01T20:02", "Sam", "dibs intro slides"),
@@ -212,34 +232,102 @@ DEMO = [
     ("2026-11-01T20:04", "Jake", "ok"),
     ("2026-11-01T20:05", "Sam", "ok"),
     ("2026-11-01T20:05", "Amrish", "ok"),
+    ("2026-11-03T11:00", None, "tick"),
+    ("2026-11-03T11:05", "Jake", "squad gift karaoke night", "dm"),
     ("2026-11-03T21:00", "Sam", "done intro slides"),
     ("2026-11-04T09:30", None, "tick"),
     ("2026-11-04T12:00", "Priya", "done research"),
     ("2026-11-04T12:30", "Amrish", "@squad status"),
     ("2026-11-06T22:00", "Amrish", "@squad receipts"),
+    ("## Game day and carpools", None, None),
+    ("2026-11-25T18:00", "Sam", "@squad game day"),
+    ("2026-11-25T18:01", "Sam", "got tix"),
+    ("2026-11-25T18:01", "Jake", "need tix"),
+    ("2026-11-25T18:02", "Amrish", "@squad ride to the game"),
+    ("2026-11-25T18:03", "Jake", "driving 3"),
+    ("2026-11-25T18:03", "Priya", "ride from barrett"),
+    ("2026-11-25T18:04", "Sam", "ride from vista del sol"),
+    ("2026-11-25T18:05", "Amrish", "@squad match rides"),
+    ("2026-11-25T18:06", "Jake", "ok"),
+    ("## Move-out market", None, None),
+    ("2026-12-08T10:00", "Jake", "@squad sell IKEA desk $40, lamp $10, mini fridge $50 obo pickup by 12/12 @ Tooker"),
+    ("2026-12-08T10:02", "Priya", "want #1"),
+    ("2026-12-08T10:03", "Sam", "want #1"),
+    ("2026-12-08T10:05", "Amrish", "offer #3 $35"),
+    ("2026-12-08T10:10", "Jake", "accept #3 amrish"),
+    ("2026-12-08T11:00", "Sam", "@squad looking for bike under $60"),
+    ("2026-12-08T12:00", "Priya", "selling my road bike, 55 bucks, pickup by 12/11"),
+    ("2026-12-08T12:01", "Priya", "list it"),
+    ("2026-12-09T10:30", None, "tick"),
+    ("2026-12-09T16:00", "Jake", "sold #1 to sam"),
+    ("2026-12-10T10:00", "Amrish", "@squad market under $30"),
+    ("2026-12-11T10:00", None, "tick"),
+    ("2026-12-11T10:05", "Jake", "drop #2 $7"),
+    ("## Breaks and roommates", None, None),
+    ("2026-12-11T12:00", "Amrish", "@squad airport"),
+    ("2026-12-11T12:05", "Amrish", "@squad chores dishes, trash, bathroom"),
+    ("2026-12-11T12:06", "Sam", "@squad add oat milk, paper towels"),
+    ("2026-12-11T12:30", "Jake", "got paper towels"),
+    ("2026-12-11T12:35", "Sam", "@squad this or that"),
 ]
+
+
+class DemoGrok:
+    """Offline stand-in for Grok in the scripted demo. Its replies are canned examples, not real model output."""
+    enabled = True
+    CANNED = {
+        "enna plan naalaiku? sapdu porom ah?": "what's the plan tomorrow? are we going out to eat?",
+        "see you at 7": "nos vemos a las 7",
+    }
+
+    def chat(self, user, system="", json_mode=False, max_tokens=300):
+        if "Translate" in system:
+            text = user.split("Text: ", 1)[1]
+            return self.CANNED.get(text)
+        if "Summarize" in system:
+            return ("- movie night Sat 7pm at Hayden Lawn is locked, invite sent\n- Jake paid you back for dinner, Priya hasn't yet\n"
+                    "- Priya asked what the plan is tomorrow")
+        return None
+
+    def json(self, user, system):
+        return None
 
 
 def cmd_demo():
     os.environ.pop("XAI_API_KEY", None)  # the demo is deterministic and offline
     tz = ZoneInfo("America/Phoenix")
     clock = {"now": datetime(2026, 10, 29, 18, 0, tzinfo=tz)}
-    bot, _ = make_bot(lambda: clock["now"], None, None)
+    bot, _ = make_bot(lambda: clock["now"], None, DemoGrok())
+    bot.weather_fetch = lambda when: None
+    bot.profiles = json.loads(json.dumps(bot.profiles))
+    bot.profile_dir = None
     members = sim_members(bot)
     handle = {p["name"]: p["handles"][0] for p in bot.profiles.values()}
-    md = ["# Squad Radar demo", "", "Group chat: Amrish, Priya, Jake, Sam (sample people and sample events).", ""]
-    for ts, who, text in DEMO:
+    names = {v: k for k, v in handle.items()}
+    md = ["# Squad Radar demo", "",
+          "Group chat: Amrish, Priya, Jake, Sam. Sample people, sample events, made-up money.",
+          "Runs offline: the two AI-written replies (🌐 translations and the 📝 tldr) are canned examples here; with a Grok key they come from Grok.", ""]
+    for row in DEMO:
+        ts, who, text = row[0], row[1], row[2]
+        if ts.startswith("##"):
+            md += [ts, ""]
+            continue
         clock["now"] = datetime.fromisoformat(ts).replace(tzinfo=tz)
         stamp = clock["now"].strftime("%a %b %d %I:%M %p")
         if who is None:
             outs = bot.tick()
             if outs:
                 md.append("*%s*" % stamp)
+        elif len(row) > 3 and row[3] == "dm":
+            md.append("**%s** (private DM to the bot, %s): %s" % (who, stamp, text))
+            outs = bot.on_message({"chat_id": "dm-" + who, "text": text, "sender": handle[who], "members": [handle[who]], "is_group": False})
         else:
-            md.append("**%s** (%s): %s" % (who, stamp, text))
+            md.append("**%s** (%s): %s" % (who, stamp, text.replace("\n", "  \n")))
             outs = bot.on_message({"chat_id": "demo", "text": text, "sender": handle[who], "members": members, "is_group": True})
         for o in outs:
-            if o.get("file"):
+            if o.get("dm"):
+                md.append("> 🤖 🔒 *private DM to %s:* %s" % (names.get(o["dm"], o["dm"]), o["text"]))
+            elif o.get("file"):
                 md.append("> 🤖 📅 *calendar invite: %s*" % os.path.basename(o["file"]))
             else:
                 md.append("> 🤖 " + o["text"].replace("\n", "  \n> "))

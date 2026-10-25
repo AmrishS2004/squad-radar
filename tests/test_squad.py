@@ -140,6 +140,9 @@ t = texts(out)
 check("one check-in per person due soon (Amrish, Sam), none for Thursday's parts",
       t.count("friendly check-in") == 2 and "Amrish, how's" in t and "Sam, how's" in t and "Priya, how's" not in t and "Jake, how's" not in t, t)
 check("check-ins don't repeat", b.tick() == [])
+clock["now"] = datetime(2026, 12, 9, 10, 0, tzinfo=TZ)
+check("no check-ins after the project deadline", "friendly check-in" not in texts(b.tick()))
+clock["now"] = datetime(2026, 11, 4, 9, 45, tzinfo=TZ)
 out = send(b, "Amrish", "@squad receipts")
 check("receipts list dated work", "intro slides (Nov 3)" in texts(out), out)
 

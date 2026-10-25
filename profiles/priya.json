@@ -1,10 +1,50 @@
 {
   "name": "Priya",
-  "handles": ["+14805550101"],
+  "handles": [
+    "+14805550101"
+  ],
   "share_reasons": false,
-  "classes": [{"days": "MWF", "start": "09:00", "end": "09:50", "label": "BIO 181"}],
+  "classes": [
+    {
+      "days": "MWF",
+      "start": "09:00",
+      "end": "09:50",
+      "label": "BIO 181"
+    }
+  ],
   "busy": [],
-  "exams": [{"date": "2026-11-02", "time": "9:00", "label": "BIO 181 midterm"}],
-  "prefs": {"earliest": "11:00", "latest": "23:00", "budget": 15, "diet": ["vegetarian"], "no_late_before_exam": true},
-  "project": {"hours_this_week": 6, "skills": ["research", "writing"], "avoid": ["presenting"]}
+  "exams": [
+    {
+      "date": "2026-11-02",
+      "time": "9:00",
+      "label": "BIO 181 midterm"
+    }
+  ],
+  "prefs": {
+    "earliest": "11:00",
+    "latest": "23:00",
+    "budget": 15,
+    "diet": [
+      "vegetarian"
+    ],
+    "no_late_before_exam": true,
+    "venmo": "priya-r",
+    "dorm": "barrett"
+  },
+  "project": {
+    "hours_this_week": 6,
+    "skills": [
+      "research",
+      "writing"
+    ],
+    "avoid": [
+      "presenting"
+    ]
+  },
+  "flights": [
+    {
+      "at": "2026-12-12T14:00"
+    }
+  ],
+  "birthday": "11-10"
 }

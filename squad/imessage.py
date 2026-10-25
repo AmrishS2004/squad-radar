@@ -17,6 +17,20 @@ SEND_TEXT = '''on run argv
   end tell
 end run'''
 
+SEND_DM = '''on run argv
+  set msgText to item 1 of argv
+  set theHandle to item 2 of argv
+  tell application "Messages"
+    try
+      set svc to 1st account whose service type = iMessage
+      send msgText to participant theHandle of svc
+    on error
+      set svc to 1st service whose service type = iMessage
+      send msgText to buddy theHandle of svc
+    end try
+  end tell
+end run'''
+
 SEND_FILE = '''on run argv
   set theFile to POSIX file (item 1 of argv)
   set chatGuid to item 2 of argv
@@ -101,17 +115,30 @@ class IMessage:
         with self._conn() as c:
             rows = c.execute(q, (self.last,)).fetchall()
         out = []
+        atts = {}
+        if rows:
+            ids = [r[0] for r in rows]
+            q2 = ("SELECT maj.message_id, a.filename FROM message_attachment_join maj JOIN attachment a ON a.ROWID = maj.attachment_id "
+                  "WHERE maj.message_id IN (%s)" % ",".join("?" * len(ids)))
+            try:
+                with self._conn() as c:
+                    for mid, fn in c.execute(q2, ids).fetchall():
+                        if fn:
+                            atts.setdefault(mid, []).append(os.path.expanduser(fn))
+            except sqlite3.Error:
+                pass
         for rid, text, body, from_me, handle, guid, name, date, n in rows:
             self.last = max(self.last, rid)
-            text = text or decode_attributed_body(body)
-            if not text:
+            text = text or decode_attributed_body(body) or ""
+            text = text.replace("\ufffc", "").strip()  # attachment placeholder character
+            if not text and not atts.get(rid):
                 continue
             is_group = n > 1
             if is_group and (name or "").lower() not in self.allow and guid.lower() not in self.allow:
                 continue  # never read chats that aren't on the allowlist
             out.append({"chat_id": guid, "chat_name": name or "", "text": text, "from_me": bool(from_me),
                         "sender": "me" if from_me else (handle or "unknown"), "is_group": is_group,
-                        "ts": apple_time(date)})
+                        "ts": apple_time(date), "attachments": atts.get(rid, [])})
         return out
 
     @staticmethod
@@ -137,6 +164,11 @@ class IMessage:
         except RuntimeError as e:
             raise RuntimeError("Messages refused to send (allow Terminal to control Messages in System Settings > "
                                "Privacy & Security > Automation): %s" % e)
+
+    def send_dm(self, handle, text):
+        r = subprocess.run(["osascript", "-e", SEND_DM, text, handle], capture_output=True, text=True, timeout=30)
+        if r.returncode != 0:
+            raise RuntimeError("Messages couldn't DM %s: %s" % (handle, r.stderr.strip()))
 
     def send_file(self, chat_guid, path):
         # Messages can only attach files from places it's allowed to read; ~/Pictures works

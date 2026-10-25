@@ -1,10 +1,46 @@
 {
   "name": "Sam",
-  "handles": ["+14805550103"],
+  "handles": [
+    "+14805550103"
+  ],
   "share_reasons": false,
-  "classes": [{"days": "MWF", "start": "13:00", "end": "13:50", "label": "PSY 101"}],
-  "busy": [{"date": "2026-11-01", "start": "10:00", "end": "13:00", "label": "church"}],
+  "classes": [
+    {
+      "days": "MWF",
+      "start": "13:00",
+      "end": "13:50",
+      "label": "PSY 101"
+    }
+  ],
+  "busy": [
+    {
+      "date": "2026-11-01",
+      "start": "10:00",
+      "end": "13:00",
+      "label": "church"
+    }
+  ],
   "exams": [],
-  "prefs": {"earliest": "10:00", "latest": "23:30", "budget": 8, "diet": []},
-  "project": {"hours_this_week": 7, "skills": ["slides", "editing", "presenting"], "avoid": []}
+  "prefs": {
+    "earliest": "10:00",
+    "latest": "23:30",
+    "budget": 8,
+    "diet": [],
+    "venmo": "sam-t",
+    "dorm": "vista del sol"
+  },
+  "project": {
+    "hours_this_week": 7,
+    "skills": [
+      "slides",
+      "editing",
+      "presenting"
+    ],
+    "avoid": []
+  },
+  "flights": [
+    {
+      "at": "2026-12-12T15:30"
+    }
+  ]
 }

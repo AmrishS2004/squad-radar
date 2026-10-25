@@ -91,3 +91,61 @@ TASKS_SYSTEM = (
     "\"hours\": number, \"skill\": one of research, writing, slides, video, coding, design, editing, presenting}]}. "
     "Hours are realistic for undergrads. No answers or graded content, just the parts of the work."
 )
+
+TRANSLATE_SYSTEM = (
+    "Translate the text into the target language. Keep slang, names, emoji and tone. Reply with the translation only, "
+    "no quotes or notes. If it's already in the target language, return it unchanged."
+)
+
+TLDR_SYSTEM = (
+    "Summarize group-chat messages for a college student who missed them. At most 5 short lines starting with '- '. "
+    "Cover decisions made, plans with times, questions still open, and anything that mentions or asks the reader "
+    "(named in 'Reader'). Only use what's in the messages. No intro line."
+)
+
+RECEIPT_SYSTEM = (
+    "Read this restaurant or store receipt. Reply with JSON only: {\"items\": [{\"name\": short, \"price\": number}], "
+    "\"tax\": number or 0, \"tip\": number or 0, \"total\": number or null}. Prices in dollars. Don't invent items."
+)
+
+
+def _image_data_url(path):
+    import base64
+    import mimetypes
+    import shutil
+    import subprocess
+    import tempfile
+    p = path
+    if p.lower().endswith(".heic") and shutil.which("sips"):
+        out = tempfile.mktemp(suffix=".jpg")
+        subprocess.run(["sips", "-s", "format", "jpeg", p, "--out", out], capture_output=True, timeout=30)
+        p = out
+    mime = mimetypes.guess_type(p)[0] or "image/jpeg"
+    with open(p, "rb") as fh:
+        return "data:%s;base64,%s" % (mime, base64.b64encode(fh.read()).decode())
+
+
+def _vision_json(self, path, system):
+    """Ask a Grok model that can see images to read `path`. Returns parsed JSON or None."""
+    if not self.enabled:
+        return None
+    try:
+        url = _image_data_url(path)
+    except OSError as e:
+        self.last_error = str(e)
+        return None
+    model = os.environ.get("XAI_VISION_MODEL") or self.pick_model()
+    body = {"model": model, "temperature": 0.1, "max_tokens": 800, "response_format": {"type": "json_object"},
+            "messages": [{"role": "system", "content": system},
+                         {"role": "user", "content": [{"type": "image_url", "image_url": {"url": url}},
+                                                      {"type": "text", "text": "Read the receipt."}]}]}
+    try:
+        data = self._req("POST", "/chat/completions", body)
+        out = data["choices"][0]["message"]["content"]
+        return json.loads(out[out.find("{"): out.rfind("}") + 1])
+    except Exception as e:  # noqa: BLE001
+        self.last_error = str(e)
+        return None
+
+
+Grok.vision_json = _vision_json
