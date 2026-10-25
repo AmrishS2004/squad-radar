@@ -38,6 +38,8 @@ def public_url():
         return os.environ["SQUAD_PUBLIC_URL"].rstrip("/")
     if os.environ.get("RAILWAY_PUBLIC_DOMAIN"):
         return "https://" + os.environ["RAILWAY_PUBLIC_DOMAIN"]
+    if os.environ.get("RENDER_EXTERNAL_URL"):
+        return os.environ["RENDER_EXTERNAL_URL"].rstrip("/")
     return "http://localhost:%s" % os.environ.get("PORT", "8080")
 
 
@@ -868,6 +870,19 @@ def make_handler(app):
     return Handler
 
 
+def keep_awake(every=600):
+    """Free hosts (Render) put a web service to sleep after ~15 idle minutes, which would also take the Discord bot
+    offline. Visiting our own health page every 10 minutes counts as traffic and keeps it up."""
+    import urllib.request
+    url = public_url() + "/api/health"
+    while True:
+        time.sleep(every)
+        try:
+            urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "squad-radar-keepalive"}), timeout=20).read()
+        except Exception as e:  # noqa: BLE001
+            sys.stderr.write("keep-awake ping failed: %r\n" % e)
+
+
 def ticker(app, every=20):
     while True:
         time.sleep(every)
@@ -884,6 +899,9 @@ def main():
     if app.model.enabled:
         threading.Thread(target=app.model.pick_model, daemon=True).start()
     threading.Thread(target=ticker, args=(app,), daemon=True).start()
+    if os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("SQUAD_KEEPALIVE"):
+        threading.Thread(target=keep_awake, daemon=True).start()
+        print("Keep-awake on: pinging %s/api/health every 10 minutes" % public_url())
     if os.environ.get("DISCORD_TOKEN"):
         try:
             from discord_bridge import DiscordBridge

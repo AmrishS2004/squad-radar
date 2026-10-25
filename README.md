@@ -204,6 +204,17 @@ chat, the Board, and an **Assistant** panel: summary, what matters, your mention
 listen out loud, and reminders that post back into the Discord channel when they're due. Every message has
 Translate and Listen buttons too.
 
+### Or put it online with Render (free)
+
+1. render.com → sign in with GitHub → **New → Blueprint** → pick `squad-radar`. It reads `render.yaml` (Docker, free plan,
+   health check).
+2. Paste your `LLM_API_KEY` (Gemini) and `DISCORD_TOKEN` when it asks, then **Apply**.
+3. When the deploy log shows `Discord: signed in as ...`, open the `onrender.com` link it gives you.
+
+Free Render services sleep after 15 minutes without visits. On Render the app visits its own health page every 10
+minutes so the Discord bot stays online. Free services have no permanent disk, so chats reset when it restarts;
+`@squad simulate` rebuilds the demo.
+
 ### Using a different model
 
 Grok is the default. Any OpenAI-compatible API works instead: set `LLM_BASE_URL`, `LLM_API_KEY` and `LLM_MODEL`

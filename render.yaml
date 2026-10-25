@@ -1,0 +1,18 @@
+# Render blueprint: render.com -> New -> Blueprint -> pick this repo. Fill in the two secret values when asked.
+services:
+  - type: web
+    name: squad-radar
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: LLM_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai
+      - key: LLM_MODEL
+        value: gemini-3.6-flash
+      - key: SQUAD_TZ
+        value: America/Phoenix
+      - key: LLM_API_KEY
+        sync: false
+      - key: DISCORD_TOKEN
+        sync: false
